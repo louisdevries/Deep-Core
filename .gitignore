@@ -1,0 +1,11 @@
+# Godot 4
+.godot/
+.import/
+*.import
+
+# build exports
+export/
+
+# system files
+.DS_Store
+Thumbs.db
