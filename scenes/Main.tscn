@@ -57,12 +57,31 @@ offset_top = 20.0
 offset_right = -20.0
 offset_bottom = 43.0
 grow_horizontal = 0
-text = "1"
+text = "GearLabel"
 horizontal_alignment = 2
 
 [node name="MoneyLabel" type="Label" parent="UI" unique_id=2106990269 groups=["ui_money"]]
+offset_left = 20.0
+offset_top = 50.0
+offset_right = 115.0
+offset_bottom = 73.0
+text = "MoneyLabel"
+
+[node name="UpgradeLabel" type="Label" parent="UI" unique_id=1199935016 groups=["ui_upgrade"]]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -129.0
+offset_top = 50.0
+offset_right = -21.0
+offset_bottom = 73.0
+grow_horizontal = 0
+text = "UpgradeLabel"
+
+[node name="CargoLabel" type="Label" parent="UI" unique_id=1626889 groups=["ui_cargo"]]
 offset_right = 40.0
 offset_bottom = 23.0
+text = "Cargo: 0 / 20"
 
 [node name="Player" parent="." unique_id=1572966348 groups=["player"] instance=ExtResource("2_rvslj")]
 position = Vector2(145, 74)

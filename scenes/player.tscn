@@ -1,13 +1,34 @@
 [gd_scene format=3 uid="uid://bgx6dsiwugpfm"]
 
-[ext_resource type="Script" uid="uid://b2yqhnifdf4c7" path="res://scripts/player_movement.gd" id="1_g2els"]
+[ext_resource type="Script" uid="uid://b2yqhnifdf4c7" path="res://scripts/player.gd" id="1_g2els"]
+[ext_resource type="AudioStream" uid="uid://8hew0w5d2y32" path="res://assets/Dirt.wav" id="2_d2wvv"]
 [ext_resource type="Texture2D" uid="uid://bk7jmvkg6tnd8" path="res://assets/Player.png" id="2_qhqgy"]
+[ext_resource type="AudioStream" uid="uid://dxknem1xepxdc" path="res://assets/Stone.wav" id="3_3v2ag"]
+[ext_resource type="Texture2D" uid="uid://dhpsjra2k6gr1" path="res://assets/particle.png" id="3_qhqgy"]
+[ext_resource type="Texture2D" uid="uid://cv6s5c0hjludh" path="res://assets/light.png" id="4_dqkch"]
+[ext_resource type="AudioStream" uid="uid://dst3c5u1b4i36" path="res://assets/Hard stone.wav" id="4_jej6c"]
+[ext_resource type="AudioStream" uid="uid://cp41dl4lpegtx" path="res://assets/Metal.wav" id="5_f1ej7"]
+[ext_resource type="AudioStream" uid="uid://bq0o2sdmdihpt" path="res://assets/Drill active.wav" id="5_qlg0r"]
+[ext_resource type="AudioStream" uid="uid://pekqa1kq4uwq" path="res://assets/Crystal.wav" id="6_oprun"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_dqkch"]
 size = Vector2(12, 12)
 
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_dqkch"]
+particle_flag_disable_z = true
+initial_velocity_min = 40.0
+initial_velocity_max = 80.0
+gravity = Vector3(0, 120, 0)
+scale_max = 2.0
+
 [node name="Player" type="CharacterBody2D" unique_id=1572966348]
 script = ExtResource("1_g2els")
+dirt_break_sound = ExtResource("2_d2wvv")
+stone_break_sound = ExtResource("3_3v2ag")
+hard_stone_break_sound = ExtResource("4_jej6c")
+metal_break_sound = ExtResource("5_f1ej7")
+crystal_break_sound = ExtResource("6_oprun")
+metadata/_edit_vertical_guides_ = [-84.0]
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=1605505763]
 texture = ExtResource("2_qhqgy")
@@ -18,3 +39,24 @@ shape = SubResource("RectangleShape2D_dqkch")
 [node name="Camera2D" type="Camera2D" parent="." unique_id=1857443087]
 offset = Vector2(0, 150)
 position_smoothing_enabled = true
+
+[node name="DrillParticles" type="GPUParticles2D" parent="." unique_id=1877092702]
+emitting = false
+amount = 12
+texture = ExtResource("3_qhqgy")
+lifetime = 0.3
+one_shot = true
+process_material = SubResource("ParticleProcessMaterial_dqkch")
+
+[node name="PointLight2D" type="PointLight2D" parent="." unique_id=197849226]
+color = Color(1, 1, 0.34117648, 1)
+energy = 1.5
+texture = ExtResource("4_dqkch")
+
+[node name="DrillSound" type="AudioStreamPlayer2D" parent="." unique_id=985376822]
+stream = ExtResource("5_qlg0r")
+
+[node name="DrillIdleSound" type="AudioStreamPlayer2D" parent="." unique_id=978389754]
+stream = ExtResource("5_qlg0r")
+
+[node name="DrillImpactSound" type="AudioStreamPlayer2D" parent="." unique_id=337378397]

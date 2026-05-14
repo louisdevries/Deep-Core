@@ -62,3 +62,15 @@ func generate_world():
 					tile = Vector2i(6, 0)
 
 			set_cell(Vector2i(x, y), TILE_SOURCE_ID, tile)
+			
+			
+func set_depth_tint(depth):
+
+	var t = clamp(depth / 120.0, 0.0, 1.0)
+
+	modulate = Color(
+		1.0 - (t * 0.5), # red darkens
+		1.0 - (t * 0.35), # green darkens slightly
+		1.0, # blue remains strongest
+		1.0
+	)
