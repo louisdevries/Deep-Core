@@ -1,0 +1,89 @@
+[gd_scene format=3 uid="uid://dhhrc3fb2u6xc"]
+
+[ext_resource type="Texture2D" uid="uid://cunrlmjaygmsa" path="res://assets/sky.png" id="1_71j4m"]
+[ext_resource type="Texture2D" uid="uid://nlr8mi0jy4c3" path="res://assets/fog.png" id="1_qfnet"]
+[ext_resource type="Script" uid="uid://b7ftlu2rhp6wr" path="res://scripts/sky_generator.gd" id="2_qfnet"]
+[ext_resource type="Texture2D" uid="uid://dawn1rnrhhi20" path="res://assets/terrain_tiles.png" id="3_i7141"]
+[ext_resource type="Script" uid="uid://cnhkmaf21wwbo" path="res://scripts/terrain_generator.gd" id="4_4mrxx"]
+[ext_resource type="PackedScene" uid="uid://bgx6dsiwugpfm" path="res://scenes/player.tscn" id="5_7r4gi"]
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_w7kh3"]
+texture = ExtResource("1_71j4m")
+0:0/0 = 0
+1:0/0 = 0
+
+[sub_resource type="TileSet" id="TileSet_e3hyu"]
+sources/0 = SubResource("TileSetAtlasSource_w7kh3")
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_i7141"]
+texture = ExtResource("1_qfnet")
+0:0/0 = 0
+
+[sub_resource type="TileSet" id="TileSet_4mrxx"]
+sources/0 = SubResource("TileSetAtlasSource_i7141")
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_q5onr"]
+texture = ExtResource("3_i7141")
+0:0/0 = 0
+1:0/0 = 0
+2:0/0 = 0
+3:0/0 = 0
+4:0/0 = 0
+5:0/0 = 0
+6:0/0 = 0
+7:0/0 = 0
+
+[sub_resource type="TileSet" id="TileSet_jhx03"]
+sources/1 = SubResource("TileSetAtlasSource_q5onr")
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_o8fc1"]
+texture = ExtResource("3_i7141")
+0:0/0 = 0
+0:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
+1:0/0 = 0
+1:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
+2:0/0 = 0
+2:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
+3:0/0 = 0
+3:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
+4:0/0 = 0
+4:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
+5:0/0 = 0
+5:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
+6:0/0 = 0
+6:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
+7:0/0 = 0
+7:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
+
+[sub_resource type="TileSet" id="TileSet_xo05s"]
+physics_layer_0/collision_layer = 1
+sources/1 = SubResource("TileSetAtlasSource_o8fc1")
+
+[node name="World" type="Node2D" unique_id=1922870698]
+
+[node name="SkyLayer" type="TileMapLayer" parent="." unique_id=829924490]
+z_index = -20
+tile_set = SubResource("TileSet_e3hyu")
+script = ExtResource("2_qfnet")
+
+[node name="FogLayer" type="TileMapLayer" parent="." unique_id=423402737 groups=["terrain_fog"]]
+z_index = 2
+tile_set = SubResource("TileSet_4mrxx")
+collision_enabled = false
+
+[node name="terrainBackground" type="TileMapLayer" parent="." unique_id=593678172 groups=["terrain_background"]]
+modulate = Color(0.6651851, 0.6651851, 0.6651851, 1)
+z_index = -5
+tile_set = SubResource("TileSet_jhx03")
+
+[node name="terrain" type="TileMapLayer" parent="." unique_id=1375496396 groups=["terrain"]]
+tile_set = SubResource("TileSet_xo05s")
+script = ExtResource("4_4mrxx")
+
+[node name="Player" parent="." unique_id=1572966348 groups=["player"] instance=ExtResource("5_7r4gi")]
+z_index = 5
+y_sort_enabled = true
+position = Vector2(145, 74)
+collision_layer = 3
+
+[node name="DarknessOverlay" type="CanvasModulate" parent="." unique_id=1038995018]

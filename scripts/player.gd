@@ -1,6 +1,9 @@
 # player.gd
 extends CharacterBody2D
 
+const TerrainData = preload("res://scripts/data/terrain_data.gd")
+const UpgradeData = preload("res://scripts/data/upgrade_data.gd")
+
 @export var move_speed = 200.0
 @export var drill_interval = 0.15
 
@@ -15,6 +18,8 @@ extends CharacterBody2D
 @export var hard_stone_break_sound: AudioStream
 @export var metal_break_sound: AudioStream
 @export var crystal_break_sound: AudioStream
+
+const TILE_SOURCE_ID = 1
 
 var fuel = 100.0
 
@@ -33,92 +38,96 @@ var upgrade_cost = 50
 var can_upgrade = false
 var current_depth = 0
 
+# NEW RESOURCE STORAGE
+var resources = {
+	"copper": 0,
+	"iron": 0,
+	"crystal": 0
+}
+
 var ui_fuel_bar
 var ui_gear_label
 var ui_money_label
 var ui_upgrade_label
+var ui_cargo_label
+var ui_copper_label
+var ui_iron_label
+var ui_crystal_label
+var ui_upgrade_title
+var ui_upgrade_cost
+var ui_upgrade_resources
+
 var drill_particles
 
 var camera
 var shake_strength = 0.0
+
 var drill_sound
-
-var cargo = 0
-var max_cargo = 20
-var ui_cargo_label
-
 var drill_idle_sound
 var drill_loop_sound
 var drill_impact_sound
 
-const TILE_SOURCE_ID = 2
+var cargo = 0
+var max_cargo = 20
+var darkness_overlay
+var revealed_tiles = {}
 
-# Atlas terrain definitions
-var terrain_types = {
-
-	Vector2i(0, 0): {
-		"name": "Dirt",
-		"required_power": 1,
-		"cargo": 0
-	},
-
-	Vector2i(1, 0): {
-		"name": "Stone",
-		"required_power": 2,
-		"cargo": 0
-	},
-
-	Vector2i(2, 0): {
-		"name": "Hard Stone",
-		"required_power": 4,
-		"cargo": 0
-	},
-
-	Vector2i(3, 0): {
-		"name": "Basic Ore",
-		"required_power": 2,
-		"cargo": 1
-	},
-
-	Vector2i(4, 0): {
-		"name": "Copper",
-		"required_power": 3,
-		"cargo": 2
-	},
-
-	Vector2i(5, 0): {
-		"name": "Iron",
-		"required_power": 5,
-		"cargo": 3
-	},
-
-	Vector2i(6, 0): {
-		"name": "Crystal",
-		"required_power": 6,
-		"cargo": 5
-	}
-}
+@onready var player_light = $PointLight2D
 
 
 func _ready():
-	terrain = get_tree().get_first_node_in_group("terrain")
 
+	terrain = get_tree().get_first_node_in_group("terrain")
+	print("=== TERRAIN DIAGNOSTIC ===")
+	print("terrain node: ", terrain.name if terrain else "null")
+	print("terrain has script: ", terrain.get_script() != null if terrain else "n/a")
+	print("terrain tile under player:", terrain.get_cell_atlas_coords(world_to_tile(global_position)))
+	print("TERRAIN NODES:")
+	for n in get_tree().get_nodes_in_group("terrain"):
+		print(n.name, " class:", n.get_class())
+	var all_terrain = get_tree().get_nodes_in_group("terrain")
+	print("nodes in 'terrain' group: ", all_terrain.size())
+	for t in all_terrain:
+		print("  - ", t.name, " | script: ", t.get_script() != null)
+
+	var all_bg = get_tree().get_nodes_in_group("terrain_background")
+	print("nodes in 'terrain_background' group: ", all_bg.size())
+	for t in all_bg:
+		print("  - ", t.name, " | script: ", t.get_script() != null)
+	print("==========================")
+		
 	ui_fuel_bar = get_tree().get_first_node_in_group("ui_fuel")
 	ui_gear_label = get_tree().get_first_node_in_group("ui_gear")
 	ui_money_label = get_tree().get_first_node_in_group("ui_money")
 	ui_upgrade_label = get_tree().get_first_node_in_group("ui_upgrade")
 	ui_cargo_label = get_tree().get_first_node_in_group("ui_cargo")
+	ui_copper_label = get_tree().get_first_node_in_group("ui_copper")
+	ui_iron_label = get_tree().get_first_node_in_group("ui_iron")
+	ui_crystal_label = get_tree().get_first_node_in_group("ui_crystal")
+	ui_upgrade_title = get_tree().get_first_node_in_group("ui_upgrade_title")
+	ui_upgrade_cost = get_tree().get_first_node_in_group("ui_upgrade_cost")
+	ui_upgrade_resources = get_tree().get_first_node_in_group("ui_upgrade_resources")
+	darkness_overlay = get_tree().get_first_node_in_group("darkness_overlay")
+	
 	drill_particles = $DrillParticles
+
 	camera = $Camera2D
+
 	drill_sound = $DrillSound
 	drill_idle_sound = $DrillIdleSound
 	drill_impact_sound = $DrillImpactSound
-	
+
 	drill_idle_sound.play()
 
 
 func _physics_process(delta):
 
+	print(
+		"player global: ",
+		global_position,
+		" tile: ",
+		world_to_tile(global_position)
+	)
 	handle_input()
 
 	if fuel <= 0:
@@ -133,7 +142,7 @@ func _physics_process(delta):
 
 	fuel = clamp(fuel, 0.0, max_fuel)
 
-	# UI updates
+	# UI Updates
 	if ui_fuel_bar:
 		ui_fuel_bar.value = fuel
 
@@ -142,19 +151,35 @@ func _physics_process(delta):
 
 	if ui_money_label:
 		ui_money_label.text = "$" + str(money)
-	
+
 	if ui_upgrade_label:
 		ui_upgrade_label.text = "Power: " + str(drill_power) + " ($" + str(upgrade_cost) + ")"
-		
+
 	if ui_cargo_label:
 		ui_cargo_label.text = "Cargo: " + str(cargo) + " / " + str(max_cargo)
 		
-	current_depth = int(global_position.y / 16)
+	if ui_copper_label:
+		ui_copper_label.text = "Copper: " + str(resources["copper"])
 
+	if ui_iron_label:
+		ui_iron_label.text = "Iron: " + str(resources["iron"])
+
+	if ui_crystal_label:
+		ui_crystal_label.text = "Crystal: " + str(resources["crystal"])
+
+	current_depth = int(global_position.y / 16)
+	update_player_light()
+	update_darkness()
+	
 	if terrain.has_method("set_depth_tint"):
 		terrain.set_depth_tint(current_depth)
 		
-	update_camera_shake()	
+	
+	reveal_nearby_tiles()
+	terrain.update_fog(global_position)
+	update_upgrade_ui()
+	update_camera_shake()
+
 
 func handle_input():
 
@@ -172,13 +197,11 @@ func handle_input():
 	# Audio transitions
 	if is_drilling and not was_drilling:
 
-		# drilling started
 		drill_idle_sound.volume_db = -6
 		drill_idle_sound.pitch_scale = 1.08
 
 	elif not is_drilling and was_drilling:
 
-		# drilling stopped
 		drill_idle_sound.volume_db = -12
 		drill_idle_sound.pitch_scale = 1.0
 
@@ -197,12 +220,12 @@ func handle_movement(delta):
 	velocity = direction.normalized() * move_speed
 
 	move_and_slide()
+	print("pos: ", global_position, " vel: ", velocity, " on_floor: ", is_on_floor(), " on_wall: ", is_on_wall())
 
 
 func world_to_tile(pos: Vector2) -> Vector2i:
 	var local_pos = terrain.to_local(pos)
 	return terrain.local_to_map(local_pos)
-
 
 func drill(delta):
 
@@ -222,31 +245,40 @@ func drill(delta):
 
 	try_break_tile(left_tile)
 	try_break_tile(right_tile)
+	
+	print("player global: ", global_position)
+	print("drill check left: ", global_position + Vector2(-6, 10), " -> tile ", world_to_tile(global_position + Vector2(-6, 10)))
 
 
 func try_break_tile(tile_pos: Vector2i):
+
 	var tile_data = terrain.get_cell_atlas_coords(tile_pos)
+
 	print("--- try_break_tile ---")
 	print("tile_pos: ", tile_pos)
 	print("tile_data: ", tile_data)
-	
+
 	if tile_data == Vector2i(-1, -1):
 		print("BAIL: empty cell")
 		return
 
-	if not terrain_types.has(tile_data):
+	if not TerrainData.TERRAIN_TYPES.has(tile_data):
 		print("BAIL: tile not in terrain_types")
 		return
 
-	var required_power = terrain_types[tile_data]["required_power"]
+	var terrain_info = TerrainData.TERRAIN_TYPES[tile_data]
+
+	var required_power = terrain_info["required_power"]
 	var effective_power = drill_power + drill_gear
+
 	print("required_power: ", required_power, " effective_power: ", effective_power)
 
 	if effective_power < required_power:
 		print("BAIL: not enough power")
 		return
 
-	var cargo_value = terrain_types[tile_data]["cargo"]
+	var cargo_value = terrain_info["cargo"]
+
 	print("cargo: ", cargo, "/", max_cargo, " cargo_value: ", cargo_value)
 
 	if cargo_value > 0 and cargo + cargo_value > max_cargo:
@@ -254,18 +286,30 @@ func try_break_tile(tile_pos: Vector2i):
 		return
 
 	print("BREAKING TILE")
+
 	spawn_drill_particles(tile_pos, tile_data)
+
 	shake_strength = required_power * 0.6
+
 	play_drill_sound(tile_data)
 	play_impact_sound(tile_data)
 
-	if cargo_value > 0:
+	# RESOURCE COLLECTION
+	var resource_type = terrain_info["resource"]
+
+	if resource_type != null:
+		resources[resource_type] += 1
+	else:
 		ore += 1
+
 	cargo += cargo_value
 
 	terrain.set_cell(tile_pos, -1)
+	
+
 
 func spawn_drill_particles(tile_pos, tile_data):
+
 	if not drill_particles:
 		return
 
@@ -273,47 +317,50 @@ func spawn_drill_particles(tile_pos, tile_data):
 
 	drill_particles.global_position = terrain.to_global(world_pos)
 
-	# Different colors per material
 	match tile_data:
 
-		Vector2i(0, 0): # dirt
+		Vector2i(0, 0):
 			drill_particles.modulate = Color.SADDLE_BROWN
 
-		Vector2i(1, 0): # stone
+		Vector2i(1, 0):
 			drill_particles.modulate = Color.GRAY
 
-		Vector2i(2, 0): # hard stone
+		Vector2i(2, 0):
 			drill_particles.modulate = Color.DIM_GRAY
 
-		Vector2i(3, 0): # basic ore
+		Vector2i(3, 0):
 			drill_particles.modulate = Color.GOLDENROD
 
-		Vector2i(4, 0): # copper
+		Vector2i(4, 0):
 			drill_particles.modulate = Color.ORANGE
 
-		Vector2i(5, 0): # iron
+		Vector2i(5, 0):
 			drill_particles.modulate = Color.LIGHT_SLATE_GRAY
 
-		Vector2i(6, 0): # crystal
+		Vector2i(6, 0):
 			drill_particles.modulate = Color.CYAN
 
 	drill_particles.restart()
 
 	drill_particles.emitting = true
 
-	
+
 func update_camera_shake():
+
 	if shake_strength > 0:
+
 		camera.offset = Vector2(
 			randf_range(-shake_strength, shake_strength),
 			randf_range(-shake_strength, shake_strength)
 		)
-		
+
 		shake_strength = lerp(shake_strength, 0.0, 0.2)
+
 	else:
+
 		camera.offset = Vector2.ZERO
 
-		
+
 func play_drill_sound(tile_data):
 
 	if not drill_sound:
@@ -321,50 +368,180 @@ func play_drill_sound(tile_data):
 
 	match tile_data:
 
-		Vector2i(0, 0): # dirt
+		Vector2i(0, 0):
 			drill_sound.pitch_scale = 1.0
 
-		Vector2i(1, 0): # stone
+		Vector2i(1, 0):
 			drill_sound.pitch_scale = 0.9
 
-		Vector2i(2, 0): # hard stone
+		Vector2i(2, 0):
 			drill_sound.pitch_scale = 0.7
 
-		Vector2i(3, 0): # ore
+		Vector2i(3, 0):
 			drill_sound.pitch_scale = 1.1
 
-		Vector2i(4, 0): # copper
+		Vector2i(4, 0):
 			drill_sound.pitch_scale = 1.15
 
-		Vector2i(5, 0): # iron
+		Vector2i(5, 0):
 			drill_sound.pitch_scale = 0.85
 
-		Vector2i(6, 0): # crystal
+		Vector2i(6, 0):
 			drill_sound.pitch_scale = 1.3
 
 	drill_sound.play()
-	
+
+
 func play_impact_sound(tile_data):
 
 	match tile_data:
 
-		Vector2i(0, 0): # dirt
+		Vector2i(0, 0):
 			drill_impact_sound.stream = dirt_break_sound
 
-		Vector2i(1, 0): # stone
+		Vector2i(1, 0):
 			drill_impact_sound.stream = stone_break_sound
 
-		Vector2i(2, 0): # hard stone
+		Vector2i(2, 0):
 			drill_impact_sound.stream = hard_stone_break_sound
 
-		Vector2i(3, 0), Vector2i(4, 0): # copper / iron
+		Vector2i(3, 0), Vector2i(4, 0), Vector2i(5, 0):
 			drill_impact_sound.stream = metal_break_sound
 
-		Vector2i(6, 0): # crystal
+		Vector2i(6, 0):
 			drill_impact_sound.stream = crystal_break_sound
 
 		_:
 			return
 
 	drill_impact_sound.pitch_scale = randf_range(0.92, 1.08)
+
 	drill_impact_sound.play()
+	
+func update_upgrade_ui():
+
+	if not can_upgrade:
+
+		ui_upgrade_title.text = ""
+		ui_upgrade_cost.text = ""
+		ui_upgrade_resources.text = ""
+
+		return
+
+	var next_level = drill_power + 1
+
+	if not UpgradeData.DRILL_UPGRADES.has(next_level):
+
+		ui_upgrade_title.text = "MAX POWER"
+		ui_upgrade_cost.text = ""
+		ui_upgrade_resources.text = ""
+
+		return
+
+	var data = UpgradeData.DRILL_UPGRADES[next_level]
+
+	ui_upgrade_title.text = "DRILL POWER " + str(next_level)
+
+	ui_upgrade_cost.text = "$" + str(money) + " / $" + str(data["money"])
+
+	var resource_text = ""
+
+	for resource_name in data["resources"]:
+
+		var required = data["resources"][resource_name]
+		var owned = resources.get(resource_name, 0)
+
+		resource_text += (
+			resource_name.capitalize()
+			+ ": "
+			+ str(owned)
+			+ " / "
+			+ str(required)
+			+ "\n"
+		)
+
+	ui_upgrade_resources.text = resource_text
+	
+func update_player_light():
+
+	if not player_light:
+		return
+
+	# surface = weak light
+	# deep underground = strong light
+
+	var t = clamp((current_depth - 5) / 60.0, 0.0, 1.0)
+
+	player_light.energy = lerp(0.15, 1.4, t)
+
+func update_darkness():
+
+	if not darkness_overlay:
+		return
+
+	# starts darkening after surface
+	var t = clamp((current_depth - 5) / 120.0, 0.0, 1.0)
+
+	# brightness range
+	var brightness = lerp(1.0, 0.18, t)
+
+	darkness_overlay.color = Color(
+		brightness,
+		brightness,
+		brightness,
+		1.0
+	)
+
+func use_sonar(radius: int):
+
+	var player_tile = world_to_tile(global_position)
+
+	for x in range(player_tile.x - radius, player_tile.x + radius):
+		for y in range(player_tile.y - radius, player_tile.y + radius):
+
+			var pos = Vector2i(x, y)
+
+			var dist = player_tile.distance_to(pos)
+
+			if dist <= radius:
+
+				var tile = terrain.get_cell_atlas_coords(pos)
+
+func reveal_nearby_tiles():
+
+	var player_tile = world_to_tile(global_position)
+
+	var radius = 6
+
+	for y in range(player_tile.y - radius, player_tile.y + radius):
+
+		# LEFT
+		for x in range(player_tile.x, player_tile.x - radius, -1):
+
+			var pos = Vector2i(x, y)
+
+			if player_tile.distance_to(pos) > radius:
+				continue
+
+			
+
+			var tile = terrain.get_cell_atlas_coords(pos)
+
+			# stop vision through walls
+			if tile != Vector2i(-1, -1):
+				break
+
+		# RIGHT
+		for x in range(player_tile.x, player_tile.x + radius):
+
+			var pos = Vector2i(x, y)
+
+			if player_tile.distance_to(pos) > radius:
+				continue
+
+			
+			var tile = terrain.get_cell_atlas_coords(pos)
+
+			# stop vision through walls
+			if tile != Vector2i(-1, -1):
+				break				

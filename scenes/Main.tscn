@@ -1,43 +1,13 @@
 [gd_scene format=3 uid="uid://k6b71ppsug21"]
 
-[ext_resource type="Texture2D" uid="uid://dawn1rnrhhi20" path="res://assets/terrain_tiles.png" id="1_elqb8"]
-[ext_resource type="Script" uid="uid://cnhkmaf21wwbo" path="res://scripts/terrain_generator.gd" id="2_0bbpv"]
-[ext_resource type="PackedScene" uid="uid://bgx6dsiwugpfm" path="res://scenes/player.tscn" id="2_rvslj"]
+[ext_resource type="PackedScene" uid="uid://dhhrc3fb2u6xc" path="res://scenes/world.tscn" id="4_jlsqs"]
 [ext_resource type="Texture2D" uid="uid://cl6tytc3lexh8" path="res://assets/fuelstation.jpg" id="4_vcsgt"]
 [ext_resource type="Script" uid="uid://cg2054q45vhjb" path="res://scripts/refuel.gd" id="5_c01mt"]
-
-[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_rarhs"]
-texture = ExtResource("1_elqb8")
-0:0/0 = 0
-0:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
-1:0/0 = 0
-1:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
-2:0/0 = 0
-2:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
-3:0/0 = 0
-3:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
-4:0/0 = 0
-4:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
-5:0/0 = 0
-5:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
-6:0/0 = 0
-6:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
-7:0/0 = 0
-7:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
-
-[sub_resource type="TileSet" id="TileSet_0bbpv"]
-physics_layer_0/collision_layer = 1
-sources/1 = SubResource("TileSetAtlasSource_rarhs")
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_vcsgt"]
 size = Vector2(72, 70)
 
 [node name="Main" type="Node2D" unique_id=1240610508]
-
-[node name="terrain" type="TileMapLayer" parent="." unique_id=1707114540 groups=["terrain"]]
-position = Vector2(-193, -3)
-tile_set = SubResource("TileSet_0bbpv")
-script = ExtResource("2_0bbpv")
 
 [node name="UI" type="CanvasLayer" parent="." unique_id=527045204]
 
@@ -83,8 +53,50 @@ offset_right = 40.0
 offset_bottom = 23.0
 text = "Cargo: 0 / 20"
 
-[node name="Player" parent="." unique_id=1572966348 groups=["player"] instance=ExtResource("2_rvslj")]
-position = Vector2(145, 74)
+[node name="CopperLabel" type="Label" parent="UI" unique_id=601753533 groups=["ui_copper"]]
+offset_left = 26.0
+offset_top = 74.0
+offset_right = 124.0
+offset_bottom = 97.0
+theme_override_colors/font_color = Color(0.81960785, 0.48235294, 0.24705882, 1)
+text = "CopperLabel"
+
+[node name="IronLabel" type="Label" parent="UI" unique_id=1097166850 groups=["ui_iron"]]
+offset_left = 29.0
+offset_top = 101.0
+offset_right = 103.0
+offset_bottom = 124.0
+theme_override_colors/font_color = Color(0.627451, 0.654902, 0.6784314, 1)
+text = "IronLabel"
+
+[node name="CrystalLabel" type="Label" parent="UI" unique_id=1797789546 groups=["ui_crystal"]]
+offset_left = 31.0
+offset_top = 126.0
+offset_right = 127.0
+offset_bottom = 149.0
+theme_override_colors/font_color = Color(0, 1, 1, 1)
+text = "CrystalLabel"
+
+[node name="UpgradeTitle" type="Label" parent="UI" unique_id=1293107643 groups=["ui_upgrade_title"]]
+offset_left = 600.0
+offset_top = 78.0
+offset_right = 700.0
+offset_bottom = 101.0
+text = "UpgradeTitle"
+
+[node name="UpgradeCost" type="Label" parent="UI" unique_id=317309109 groups=["ui_upgrade_cost"]]
+offset_left = 598.0
+offset_top = 105.0
+offset_right = 699.0
+offset_bottom = 128.0
+text = "UpgradeCost"
+
+[node name="UpgradeResources" type="Label" parent="UI" unique_id=1542505465 groups=["ui_upgrade_resources"]]
+offset_left = 554.0
+offset_top = 127.0
+offset_right = 700.0
+offset_bottom = 150.0
+text = "UpgradeResources"
 
 [node name="RefuelZone" type="Area2D" parent="." unique_id=943789613]
 position = Vector2(40, 404)
@@ -98,3 +110,5 @@ shape = SubResource("RectangleShape2D_vcsgt")
 position = Vector2(-45.99994, -360.99997)
 scale = Vector2(0.058333334, 0.058333334)
 texture = ExtResource("4_vcsgt")
+
+[node name="World" parent="." unique_id=1922870698 instance=ExtResource("4_jlsqs")]
