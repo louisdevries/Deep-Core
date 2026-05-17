@@ -3,6 +3,7 @@ extends CharacterBody2D
 
 const TerrainData = preload("res://scripts/data/terrain_data.gd")
 const UpgradeData = preload("res://scripts/data/upgrade_data.gd")
+const ResourceData = preload("res://scripts/data/resource_data.gd")
 
 @export var move_speed = 200.0
 @export var drill_interval = 0.15
@@ -18,6 +19,8 @@ const UpgradeData = preload("res://scripts/data/upgrade_data.gd")
 @export var hard_stone_break_sound: AudioStream
 @export var metal_break_sound: AudioStream
 @export var crystal_break_sound: AudioStream
+
+var hazard_layer: TileMapLayer
 
 const TILE_SOURCE_ID = 1
 
@@ -38,11 +41,35 @@ var upgrade_cost = 50
 var can_upgrade = false
 var current_depth = 0
 
+# HEALTH
+@export var max_health: float = 100.0
+var health: float = 100.0
+var health_regen_rate: float = 3.0           # HP per second when safe
+var time_since_damage: float = 0.0
+var regen_delay: float = 4.0                 # seconds before regen kicks in
+var is_dead: bool = false
+var damage_flash_timer: float = 0.0
+
+# RESPAWN
+var spawn_position: Vector2
+
+# UI
+var ui_health_bar
+
 # NEW RESOURCE STORAGE
 var resources = {
 	"copper": 0,
 	"iron": 0,
 	"crystal": 0
+}
+
+const SONAR_TARGETS := {
+	Vector2i(4, 0): Color(1.0, 0.7, 0.3, 1.0),    # Basic Ore - amber
+	Vector2i(5, 0): Color(1.0, 0.5, 0.1, 1.0),    # Copper - orange
+	Vector2i(6, 0): Color(0.8, 0.85, 0.9, 1.0),   # Iron - silver
+	Vector2i(7, 0): Color(0.2, 1.0, 1.0, 1.0),    # Crystal - cyan
+	Vector2i(8, 0): Color(1.0, 0.2, 0.0, 1.0),    # Lava - red (warning)
+	Vector2i(9, 0): Color(0.3, 1.0, 0.2, 1.0),    # Gas - green (warning)
 }
 
 var ui_fuel_bar
@@ -56,6 +83,7 @@ var ui_crystal_label
 var ui_upgrade_title
 var ui_upgrade_cost
 var ui_upgrade_resources
+var ui_sonar_label
 
 var drill_particles
 
@@ -71,6 +99,21 @@ var cargo = 0
 var max_cargo = 20
 var darkness_overlay
 var revealed_tiles = {}
+
+# SONAR
+var sonar_range: int = 8
+var sonar_terrain_duration: float = 3.0   # how long terrain stays revealed
+var sonar_marker_duration: float = 6.0    # resource pulses last longer
+var sonar_cooldown: float = 8.0
+var sonar_cooldown_timer: float = 0.0
+var sonar_markers_container: Node2D
+
+# SONAR sweep state
+var sonar_active: bool = false
+var sonar_sweep_time: float = 0.0
+var sonar_sweep_duration: float = 0.8    # how long the ring takes to expand fully
+var sonar_last_radius: float = 0.0
+var sonar_center_tile: Vector2i
 
 @onready var player_light = $PointLight2D
 
@@ -107,6 +150,16 @@ func _ready():
 	ui_upgrade_title = get_tree().get_first_node_in_group("ui_upgrade_title")
 	ui_upgrade_cost = get_tree().get_first_node_in_group("ui_upgrade_cost")
 	ui_upgrade_resources = get_tree().get_first_node_in_group("ui_upgrade_resources")
+	ui_sonar_label = get_tree().get_first_node_in_group("ui_sonar")
+	ui_health_bar = get_tree().get_first_node_in_group("ui_health")
+	hazard_layer = get_tree().get_first_node_in_group("hazards")
+	spawn_position = global_position
+	health = max_health
+# container for sonar markers (so we can clear them all at once)
+	sonar_markers_container = Node2D.new()
+	sonar_markers_container.name = "SonarMarkers"
+	sonar_markers_container.z_index = 10
+	get_tree().current_scene.add_child.call_deferred(sonar_markers_container)
 	darkness_overlay = get_tree().get_first_node_in_group("darkness_overlay")
 	
 	drill_particles = $DrillParticles
@@ -129,8 +182,14 @@ func _physics_process(delta):
 		world_to_tile(global_position)
 	)
 	handle_input()
-
-	if fuel <= 0:
+	
+	update_sonar_sweep(delta)
+	if sonar_cooldown_timer > 0.0:
+		sonar_cooldown_timer = max(0.0, sonar_cooldown_timer - delta)
+	check_hazard_contact(delta)
+	update_health(delta)
+	
+	if fuel <= 0 or is_dead:
 		velocity = Vector2.ZERO
 		return
 
@@ -166,16 +225,24 @@ func _physics_process(delta):
 
 	if ui_crystal_label:
 		ui_crystal_label.text = "Crystal: " + str(resources["crystal"])
+		
+	if ui_sonar_label:
+		if sonar_cooldown_timer > 0.0:
+			ui_sonar_label.text = "Sonar: %.1fs" % sonar_cooldown_timer
+		else:
+			ui_sonar_label.text = "Sonar: READY"
+					
+	if ui_health_bar:
+		ui_health_bar.value = health
 
 	current_depth = int(global_position.y / 16)
 	update_player_light()
 	update_darkness()
 	
 	if terrain.has_method("set_depth_tint"):
-		terrain.set_depth_tint(current_depth)
-		
+		terrain.set_depth_tint(current_depth)		
 	
-	reveal_nearby_tiles()
+	
 	terrain.update_fog(global_position)
 	update_upgrade_ui()
 	update_camera_shake()
@@ -193,6 +260,9 @@ func handle_input():
 
 	if Input.is_action_just_pressed("ui_page_down"):
 		drill_gear = max(drill_gear - 1, 1)
+		
+	if Input.is_action_just_pressed("sonar"):
+		use_sonar()
 
 	# Audio transitions
 	if is_drilling and not was_drilling:
@@ -252,18 +322,19 @@ func drill(delta):
 
 func try_break_tile(tile_pos: Vector2i):
 
-	var tile_data = terrain.get_cell_atlas_coords(tile_pos)
+	# try terrain first
+	var tile_data: Vector2i = terrain.get_cell_atlas_coords(tile_pos)
+	var source_layer: TileMapLayer = terrain
 
-	print("--- try_break_tile ---")
-	print("tile_pos: ", tile_pos)
-	print("tile_data: ", tile_data)
+	# if terrain is empty here, check hazard layer
+	if tile_data == Vector2i(-1, -1) and hazard_layer:
+		tile_data = hazard_layer.get_cell_atlas_coords(tile_pos)
+		source_layer = hazard_layer
 
 	if tile_data == Vector2i(-1, -1):
-		print("BAIL: empty cell")
 		return
 
 	if not TerrainData.TERRAIN_TYPES.has(tile_data):
-		print("BAIL: tile not in terrain_types")
 		return
 
 	var terrain_info = TerrainData.TERRAIN_TYPES[tile_data]
@@ -271,41 +342,34 @@ func try_break_tile(tile_pos: Vector2i):
 	var required_power = terrain_info["required_power"]
 	var effective_power = drill_power + drill_gear
 
-	print("required_power: ", required_power, " effective_power: ", effective_power)
-
 	if effective_power < required_power:
-		print("BAIL: not enough power")
 		return
 
 	var cargo_value = terrain_info["cargo"]
 
-	print("cargo: ", cargo, "/", max_cargo, " cargo_value: ", cargo_value)
-
 	if cargo_value > 0 and cargo + cargo_value > max_cargo:
-		print("BAIL: cargo full")
 		return
 
-	print("BREAKING TILE")
-
 	spawn_drill_particles(tile_pos, tile_data)
-
 	shake_strength = required_power * 0.6
-
 	play_drill_sound(tile_data)
 	play_impact_sound(tile_data)
 
-	# RESOURCE COLLECTION
 	var resource_type = terrain_info["resource"]
 
 	if resource_type != null:
 		resources[resource_type] += 1
-	else:
+	elif terrain_info.get("hazard") == null:
+		# only count "ore" for non-hazard non-resource tiles
 		ore += 1
 
 	cargo += cargo_value
 
-	terrain.set_cell(tile_pos, -1)
+	source_layer.set_cell(tile_pos, -1)
 	
+	# wake hazards that might want to flow into the new empty cell
+	if terrain.has_method("_wake_neighbors"):
+		terrain._wake_neighbors(tile_pos)
 
 
 func spawn_drill_particles(tile_pos, tile_data):
@@ -492,56 +556,224 @@ func update_darkness():
 		1.0
 	)
 
-func use_sonar(radius: int):
 
-	var player_tile = world_to_tile(global_position)
+func use_sonar() -> void:
 
-	for x in range(player_tile.x - radius, player_tile.x + radius):
-		for y in range(player_tile.y - radius, player_tile.y + radius):
+	if sonar_cooldown_timer > 0.0 or sonar_active:
+		return
 
-			var pos = Vector2i(x, y)
+	sonar_cooldown_timer = sonar_cooldown
 
-			var dist = player_tile.distance_to(pos)
+	# clear leftover markers from a previous ping
+	for child in sonar_markers_container.get_children():
+		child.queue_free()
 
-			if dist <= radius:
+	sonar_active = true
+	sonar_sweep_time = 0.0
+	sonar_last_radius = 0.0
+	sonar_center_tile = world_to_tile(global_position)
 
-				var tile = terrain.get_cell_atlas_coords(pos)
+	print("Sonar sweep started")
 
-func reveal_nearby_tiles():
+func spawn_sonar_marker(tile_pos: Vector2i, color: Color) -> void:
 
-	var player_tile = world_to_tile(global_position)
+	var marker := Sprite2D.new()
 
-	var radius = 6
+	# build a small bright square texture procedurally
+	var img := Image.create(12, 12, false, Image.FORMAT_RGBA8)
+	img.fill(color)
+	marker.texture = ImageTexture.create_from_image(img)
 
-	for y in range(player_tile.y - radius, player_tile.y + radius):
+	# position at the tile's center, in world space
+	var local_pos: Vector2 = terrain.map_to_local(tile_pos)
+	marker.global_position = terrain.to_global(local_pos)
 
-		# LEFT
-		for x in range(player_tile.x, player_tile.x - radius, -1):
+	# pulsing tween for visibility through fog
+	sonar_markers_container.add_child(marker)
 
-			var pos = Vector2i(x, y)
+	var tween := marker.create_tween().set_loops()
+	tween.tween_property(marker, "modulate:a", 0.4, 0.5)
+	tween.tween_property(marker, "modulate:a", 1.0, 0.5)
 
-			if player_tile.distance_to(pos) > radius:
+
+func clear_sonar_markers() -> void:
+
+	if not is_instance_valid(sonar_markers_container):
+		return
+
+	for child in sonar_markers_container.get_children():
+		child.queue_free()
+		
+		
+func update_sonar_sweep(delta: float) -> void:
+
+	if not sonar_active:
+		return
+
+	sonar_sweep_time += delta
+
+	var t: float = clamp(sonar_sweep_time / sonar_sweep_duration, 0.0, 1.0)
+
+	# ease-out so the ring decelerates as it reaches max range (feels natural)
+	var eased: float = 1.0 - pow(1.0 - t, 2.0)
+
+	var current_radius: float = eased * float(sonar_range)
+
+	# stamp the new ring band into the terrain's reveal dict
+	if terrain.has_method("sonar_reveal_ring"):
+		terrain.sonar_reveal_ring(
+			sonar_center_tile,
+			sonar_last_radius,
+			current_radius,
+			sonar_terrain_duration
+		)
+
+	# spawn resource markers for any new valuable tiles in the band
+	spawn_markers_in_ring(sonar_last_radius, current_radius)
+
+	sonar_last_radius = current_radius
+
+	if t >= 1.0:
+		sonar_active = false
+
+		# auto-clear markers after the linger duration
+		get_tree().create_timer(sonar_marker_duration).timeout.connect(clear_sonar_markers)
+		
+func spawn_markers_in_ring(inner: float, outer: float) -> void:
+
+	var r_int: int = int(ceil(outer))
+
+	for x in range(sonar_center_tile.x - r_int, sonar_center_tile.x + r_int + 1):
+		for y in range(sonar_center_tile.y - r_int, sonar_center_tile.y + r_int + 1):
+
+			var pos := Vector2i(x, y)
+			var dist: float = sonar_center_tile.distance_to(pos)
+
+			if dist < inner or dist > outer:
 				continue
 
-			
+			# check terrain first
+			var tile: Vector2i = terrain.get_cell_atlas_coords(pos)
 
-			var tile = terrain.get_cell_atlas_coords(pos)
+			# fall back to hazard layer
+			if tile == Vector2i(-1, -1) and hazard_layer:
+				tile = hazard_layer.get_cell_atlas_coords(pos)
 
-			# stop vision through walls
-			if tile != Vector2i(-1, -1):
-				break
-
-		# RIGHT
-		for x in range(player_tile.x, player_tile.x + radius):
-
-			var pos = Vector2i(x, y)
-
-			if player_tile.distance_to(pos) > radius:
+			if not SONAR_TARGETS.has(tile):
 				continue
 
+			spawn_sonar_marker(pos, SONAR_TARGETS[tile])
 			
-			var tile = terrain.get_cell_atlas_coords(pos)
+func take_damage(amount: float, source: String = "") -> void:
 
-			# stop vision through walls
-			if tile != Vector2i(-1, -1):
-				break				
+	if is_dead:
+		return
+
+	health -= amount
+	time_since_damage = 0.0
+	damage_flash_timer = 0.15
+
+	# camera shake on hit
+	shake_strength = max(shake_strength, amount * 0.15)
+
+	print("Took ", amount, " damage from ", source, " | HP: ", health)
+
+	if health <= 0.0:
+		die()
+		
+func die() -> void:
+
+	is_dead = true
+	health = 0.0
+
+	print("=== PLAYER DIED ===")
+
+	# wipe cargo and carried resources (money stays - it's in the bank)
+	cargo = 0
+	ore = 0
+	resources["copper"] = 0
+	resources["iron"] = 0
+	resources["crystal"] = 0
+
+	# brief pause then respawn
+	get_tree().create_timer(1.5).timeout.connect(respawn)
+
+
+func respawn() -> void:
+
+	global_position = spawn_position
+	velocity = Vector2.ZERO
+	health = max_health
+	fuel = max_fuel
+	is_dead = false
+
+	print("Respawned at base")
+	
+	
+func check_hazard_contact(delta: float) -> void:
+
+	if is_dead:
+		return
+
+	if not hazard_layer:
+		return
+
+	var check_offsets: Array = [
+		Vector2(0, 0),
+		Vector2(-6, -6),
+		Vector2(6, -6),
+		Vector2(-6, 6),
+		Vector2(6, 6),
+	]
+
+	var health_dmg: float = 0.0
+	var fuel_dmg: float = 0.0
+
+	for offset in check_offsets:
+
+		var world_pos: Vector2 = global_position + offset
+		var check_tile: Vector2i = hazard_layer.local_to_map(hazard_layer.to_local(world_pos))
+		var tile_data: Vector2i = hazard_layer.get_cell_atlas_coords(check_tile)
+
+		if tile_data == Vector2i(-1, -1):
+			continue
+
+		if not TerrainData.TERRAIN_TYPES.has(tile_data):
+			continue
+
+		var info: Dictionary = TerrainData.TERRAIN_TYPES[tile_data]
+
+		if not info.has("hazard"):
+			continue
+
+		var ch: float = info.get("contact_damage", 0.0)
+		var fh: float = info.get("fuel_damage", 0.0)
+
+		if ch > health_dmg:
+			health_dmg = ch
+		if fh > fuel_dmg:
+			fuel_dmg = fh
+
+	if health_dmg > 0.0:
+		take_damage(health_dmg * delta, "hazard")
+
+	if fuel_dmg > 0.0:
+		fuel = max(0.0, fuel - fuel_dmg * delta)
+		
+		
+func update_health(delta: float) -> void:
+
+	if is_dead:
+		return
+
+	time_since_damage += delta
+
+	if time_since_damage >= regen_delay and health < max_health:
+		health = min(max_health, health + health_regen_rate * delta)
+
+	# red flash sprite tint when hit
+	if damage_flash_timer > 0.0:
+		damage_flash_timer -= delta
+		$Sprite2D.modulate = Color(1.5, 0.4, 0.4, 1.0)
+	else:
+		$Sprite2D.modulate = Color.WHITE

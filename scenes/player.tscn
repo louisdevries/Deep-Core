@@ -38,6 +38,10 @@ shape = SubResource("RectangleShape2D_dqkch")
 
 [node name="Camera2D" type="Camera2D" parent="." unique_id=1857443087]
 offset = Vector2(0, 150)
+limit_left = -760
+limit_top = -198
+limit_right = 802
+limit_bottom = 3202
 position_smoothing_enabled = true
 
 [node name="DrillParticles" type="GPUParticles2D" parent="." unique_id=1877092702]

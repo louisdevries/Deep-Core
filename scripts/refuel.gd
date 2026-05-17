@@ -68,6 +68,8 @@ func attempt_upgrade(player):
 
 
 func _on_body_entered(body):
+	
+	body.spawn_position = body.global_position
 
 	if body.is_in_group("player"):
 

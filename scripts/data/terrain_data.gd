@@ -65,5 +65,26 @@ const TERRAIN_TYPES = {
 		"required_power": 6,
 		"cargo": 5,
 		"resource": "crystal"
+	},
+	
+	# LAVA
+	Vector2i(8, 0): {
+		"name": "Lava",
+		"required_power": 999,
+		"cargo": 0,
+		"resource": null,
+		"hazard": "lava",
+		"contact_damage": 25.0
+	},
+
+	# GAS POCKET
+	Vector2i(9, 0): {
+		"name": "Gas Pocket",
+		"required_power": 1,
+		"cargo": 0,
+		"resource": null,
+		"hazard": "gas",
+		"fuel_damage": 20.0,
+		"contact_damage": 0.0
 	}
 }
