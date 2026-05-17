@@ -1,6 +1,10 @@
+# refuel.gd
 extends Area2D
 
-const UpgradeData = preload("res://scripts/data/upgrade_data.gd")
+const UpgradeMenuScene := preload("res://scenes/upgrade_menu.tscn")
+
+var armed: bool = false
+var upgrade_menu: CanvasLayer = null
 
 
 func _ready():
@@ -8,92 +12,54 @@ func _ready():
 	body_entered.connect(_on_body_entered)
 	body_exited.connect(_on_body_exited)
 
+	armed = not SaveSystem.has_save()
 
-func _process(delta):
-
-	if Input.is_action_just_pressed("interact"):
-
-		var bodies = get_overlapping_bodies()
-
-		for body in bodies:
-
-			if body.is_in_group("player"):
-
-				attempt_upgrade(body)
-
-
-func attempt_upgrade(player):
-
-	var next_level = player.drill_power + 1
-
-	if not UpgradeData.DRILL_UPGRADES.has(next_level):
-
-		print("Max upgrade level reached")
-		return
-
-	var upgrade_data = UpgradeData.DRILL_UPGRADES[next_level]
-
-	var required_money = upgrade_data["money"]
-	var required_resources = upgrade_data["resources"]
-
-	# CHECK MONEY
-	if player.money < required_money:
-
-		print("Not enough money")
-		return
-
-	# CHECK RESOURCES
-	for resource_name in required_resources:
-
-		var amount_needed = required_resources[resource_name]
-
-		if player.resources.get(resource_name, 0) < amount_needed:
-
-			print("Missing resource:", resource_name)
-			return
-
-	# REMOVE MONEY
-	player.money -= required_money
-
-	# REMOVE RESOURCES
-	for resource_name in required_resources:
-
-		player.resources[resource_name] -= required_resources[resource_name]
-
-	# APPLY UPGRADE
-	player.drill_power += 1
-
-	print("Drill upgraded!")
-	print("New Power:", player.drill_power)
+	# instantiate the menu once and reuse it
+	upgrade_menu = UpgradeMenuScene.instantiate()
+	get_tree().current_scene.add_child.call_deferred(upgrade_menu)
 
 
 func _on_body_entered(body):
-	
-	body.spawn_position = body.global_position
 
-	if body.is_in_group("player"):
+	if not body.is_in_group("player"):
+		return
 
+	if not armed:
 		body.can_upgrade = true
+		return
 
-		# REFUEL
+	body.can_upgrade = true
+
+	# refuel
+	if body.fuel < body.max_fuel:
 		body.fuel = body.max_fuel
 
-		# SELL BASIC ORE ONLY
-		var earned = body.ore * body.ore_sell_value
-
+	# sell ore
+	var earned = body.ore * body.ore_sell_value
+	if earned > 0:
 		body.money += earned
 
-		print("Sold ore for:", earned)
+	body.ore = 0
+	body.cargo = 0
 
-		# CLEAR SELLABLE ORE
-		body.ore = 0
+	# save
+	var world_save: Dictionary = body.terrain.build_world_save() if body.terrain else {}
+	var player_save: Dictionary = body.build_player_save()
 
-		# CLEAR CARGO
-		body.cargo = 0
+	var payload := player_save.duplicate()
+	for key in world_save.keys():
+		payload[key] = world_save[key]
+
+	SaveSystem.save_game(payload)
+	print("Game saved at refuel zone")
+
+	# open upgrade menu
+	if upgrade_menu and upgrade_menu.has_method("open"):
+		upgrade_menu.open(body)
 
 
 func _on_body_exited(body):
 
 	if body.is_in_group("player"):
-
 		body.can_upgrade = false
+		armed = true

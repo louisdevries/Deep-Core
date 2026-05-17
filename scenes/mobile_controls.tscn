@@ -1,9 +1,11 @@
 [gd_scene format=3 uid="uid://btctoe0vkivh1"]
 
 [ext_resource type="Texture2D" uid="uid://bjuga2t0l6fgn" path="res://icon.svg" id="1_k8ypl"]
+[ext_resource type="Script" uid="uid://xdl20dop6ey2" path="res://scripts/upgrade_menu.gd" id="1_l7u83"]
 
 [node name="MobileControls" type="CanvasLayer" unique_id=2106365054]
 layer = 10
+script = ExtResource("1_l7u83")
 
 [node name="DPadLeft" type="TouchScreenButton" parent="." unique_id=610532341]
 position = Vector2(5, 1080)

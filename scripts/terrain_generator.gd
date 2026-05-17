@@ -25,6 +25,8 @@ var gas_dissipate_chance: float = 0.002   # per tick per cell - very slow
 var cave_zones = []
 
 var sonar_duration := 1.5
+var world_seed: int = 0
+var cleared_cells: Dictionary = {}   # Vector2i -> true (tiles the player has cleared)
 
 
 func _process(delta: float) -> void:
@@ -59,7 +61,17 @@ func _wake_neighbors(pos: Vector2i) -> void:
 func _ready():
 	randomize()
 
-	noise.seed = randi()
+	# check for saved data first
+	var save := SaveSystem.load_game() if SaveSystem.has_save() else {}
+
+	if save.has("world_seed"):
+		world_seed = int(save["world_seed"])
+	else:
+		world_seed = randi()
+
+	seed(world_seed)            # makes randf/randi deterministic
+	noise.seed = world_seed
+
 	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
 	noise.frequency = 0.08
 	noise.fractal_octaves = 3
@@ -80,6 +92,10 @@ func _ready():
 	generate_world()
 	fill_fog()
 	carve_caves()
+
+	# now apply saved overrides (player-cleared cells, current hazard positions)
+	if not save.is_empty():
+		_apply_world_save(save)
 
 
 # -------------------------
@@ -450,3 +466,56 @@ func _move_hazard(from: Vector2i, to: Vector2i, tile: Vector2i) -> void:
 
 	# the now-empty source cell might let other hazards flow into it
 	_wake_neighbors(from)
+
+
+func _apply_world_save(save: Dictionary) -> void:
+
+	# restore player-cleared terrain cells
+	if save.has("cleared_cells"):
+		for cell_str in save["cleared_cells"]:
+			var parts: PackedStringArray = cell_str.split(",")
+			if parts.size() != 2:
+				continue
+			var pos := Vector2i(int(parts[0]), int(parts[1]))
+			set_cell(pos, -1)
+			cleared_cells[pos] = true
+
+	# restore hazards (overwrite generated ones with saved state)
+	if save.has("hazards") and hazard_layer:
+		hazard_layer.clear()
+		active_hazards.clear()
+
+		for h in save["hazards"]:
+			var pos := Vector2i(int(h["x"]), int(h["y"]))
+			var tile := Vector2i(int(h["tx"]), int(h["ty"]))
+			hazard_layer.set_cell(pos, TILE_SOURCE_ID, tile)
+			active_hazards[pos] = true
+		
+			
+func mark_cleared(pos: Vector2i) -> void:
+	cleared_cells[pos] = true
+	
+	
+func build_world_save() -> Dictionary:
+
+	var cleared: Array = []
+	for pos in cleared_cells.keys():
+		cleared.append(str(pos.x) + "," + str(pos.y))
+
+	var hazards: Array = []
+	if hazard_layer:
+		# enumerate every used hazard cell
+		for cell in hazard_layer.get_used_cells():
+			var tile: Vector2i = hazard_layer.get_cell_atlas_coords(cell)
+			hazards.append({
+				"x": cell.x,
+				"y": cell.y,
+				"tx": tile.x,
+				"ty": tile.y
+			})
+
+	return {
+		"world_seed": world_seed,
+		"cleared_cells": cleared,
+		"hazards": hazards
+	}

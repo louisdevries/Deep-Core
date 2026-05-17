@@ -75,15 +75,12 @@ const SONAR_TARGETS := {
 var ui_fuel_bar
 var ui_gear_label
 var ui_money_label
-var ui_upgrade_label
 var ui_cargo_label
 var ui_copper_label
 var ui_iron_label
 var ui_crystal_label
-var ui_upgrade_title
-var ui_upgrade_cost
-var ui_upgrade_resources
 var ui_sonar_label
+var ui_drill_dir_label
 
 var drill_particles
 
@@ -94,6 +91,9 @@ var drill_sound
 var drill_idle_sound
 var drill_loop_sound
 var drill_impact_sound
+# DRILL SWIVEL
+var drill_swivel_tier: int = 1            # 1=down only, 2=stop-to-swivel, 3=free swivel
+var drill_direction: Vector2i = Vector2i.DOWN
 
 var cargo = 0
 var max_cargo = 20
@@ -141,18 +141,15 @@ func _ready():
 		
 	ui_fuel_bar = get_tree().get_first_node_in_group("ui_fuel")
 	ui_gear_label = get_tree().get_first_node_in_group("ui_gear")
-	ui_money_label = get_tree().get_first_node_in_group("ui_money")
-	ui_upgrade_label = get_tree().get_first_node_in_group("ui_upgrade")
+	ui_money_label = get_tree().get_first_node_in_group("ui_money")	
 	ui_cargo_label = get_tree().get_first_node_in_group("ui_cargo")
 	ui_copper_label = get_tree().get_first_node_in_group("ui_copper")
 	ui_iron_label = get_tree().get_first_node_in_group("ui_iron")
-	ui_crystal_label = get_tree().get_first_node_in_group("ui_crystal")
-	ui_upgrade_title = get_tree().get_first_node_in_group("ui_upgrade_title")
-	ui_upgrade_cost = get_tree().get_first_node_in_group("ui_upgrade_cost")
-	ui_upgrade_resources = get_tree().get_first_node_in_group("ui_upgrade_resources")
+	ui_crystal_label = get_tree().get_first_node_in_group("ui_crystal")	
 	ui_sonar_label = get_tree().get_first_node_in_group("ui_sonar")
 	ui_health_bar = get_tree().get_first_node_in_group("ui_health")
 	hazard_layer = get_tree().get_first_node_in_group("hazards")
+	ui_drill_dir_label = get_tree().get_first_node_in_group("ui_drill_dir")
 	spawn_position = global_position
 	health = max_health
 # container for sonar markers (so we can clear them all at once)
@@ -169,7 +166,12 @@ func _ready():
 	drill_sound = $DrillSound
 	drill_idle_sound = $DrillIdleSound
 	drill_impact_sound = $DrillImpactSound
-
+	
+	# restore player state from save (if any)
+	var save := SaveSystem.data
+	if not save.is_empty():
+		apply_player_save(save)
+		
 	drill_idle_sound.play()
 
 
@@ -209,10 +211,7 @@ func _physics_process(delta):
 		ui_gear_label.text = "Gear: " + str(drill_gear)
 
 	if ui_money_label:
-		ui_money_label.text = "$" + str(money)
-
-	if ui_upgrade_label:
-		ui_upgrade_label.text = "Power: " + str(drill_power) + " ($" + str(upgrade_cost) + ")"
+		ui_money_label.text = "$" + str(money)	
 
 	if ui_cargo_label:
 		ui_cargo_label.text = "Cargo: " + str(cargo) + " / " + str(max_cargo)
@@ -234,7 +233,13 @@ func _physics_process(delta):
 					
 	if ui_health_bar:
 		ui_health_bar.value = health
-
+	
+	if ui_drill_dir_label:
+		match drill_direction:
+			Vector2i.LEFT:  ui_drill_dir_label.text = "Drill: ←"
+			Vector2i.DOWN:  ui_drill_dir_label.text = "Drill: ↓"
+			Vector2i.RIGHT: ui_drill_dir_label.text = "Drill: →"
+			
 	current_depth = int(global_position.y / 16)
 	update_player_light()
 	update_darkness()
@@ -244,7 +249,6 @@ func _physics_process(delta):
 	
 	
 	terrain.update_fog(global_position)
-	update_upgrade_ui()
 	update_camera_shake()
 
 
@@ -274,12 +278,15 @@ func handle_input():
 
 		drill_idle_sound.volume_db = -12
 		drill_idle_sound.pitch_scale = 1.0
+		
+	# DRILL DIRECTION (swivel system)
+	if drill_swivel_tier >= 2:
+		_handle_swivel_input()
 
 
 func handle_movement(delta):
 
 	var direction = Vector2.ZERO
-
 	direction.x = Input.get_axis("ui_left", "ui_right")
 	direction.y = Input.get_axis("ui_up", "ui_down")
 
@@ -287,11 +294,11 @@ func handle_movement(delta):
 		last_direction = direction.normalized()
 		fuel -= fuel_drain_move * delta
 
-	velocity = direction.normalized() * move_speed
+	# safety: fall back if move_speed is null
+	var speed: float = move_speed if move_speed != null else 200.0
+	velocity = direction.normalized() * speed
 
 	move_and_slide()
-	print("pos: ", global_position, " vel: ", velocity, " on_floor: ", is_on_floor(), " on_wall: ", is_on_wall())
-
 
 func world_to_tile(pos: Vector2) -> Vector2i:
 	var local_pos = terrain.to_local(pos)
@@ -309,16 +316,29 @@ func drill(delta):
 	# fuel usage scales with gear
 	fuel -= fuel_drain_drill * drill_gear * delta
 
-	# drill below player
-	var left_tile = world_to_tile(global_position + Vector2(-6, 10))
-	var right_tile = world_to_tile(global_position + Vector2(6, 10))
+	# compute drill targets based on direction
+	var perpendicular_offset: int = 6
+	var depth_offset: int = 10
 
-	try_break_tile(left_tile)
-	try_break_tile(right_tile)
-	
-	print("player global: ", global_position)
-	print("drill check left: ", global_position + Vector2(-6, 10), " -> tile ", world_to_tile(global_position + Vector2(-6, 10)))
+	var target_a: Vector2
+	var target_b: Vector2
 
+	match drill_direction:
+
+		Vector2i.DOWN:
+			target_a = global_position + Vector2(-perpendicular_offset, depth_offset)
+			target_b = global_position + Vector2(perpendicular_offset, depth_offset)
+
+		Vector2i.LEFT:
+			target_a = global_position + Vector2(-depth_offset, -perpendicular_offset)
+			target_b = global_position + Vector2(-depth_offset, perpendicular_offset)
+
+		Vector2i.RIGHT:
+			target_a = global_position + Vector2(depth_offset, -perpendicular_offset)
+			target_b = global_position + Vector2(depth_offset, perpendicular_offset)
+
+	try_break_tile(world_to_tile(target_a))
+	try_break_tile(world_to_tile(target_b))
 
 func try_break_tile(tile_pos: Vector2i):
 
@@ -359,14 +379,17 @@ func try_break_tile(tile_pos: Vector2i):
 
 	if resource_type != null:
 		resources[resource_type] += 1
-	elif terrain_info.get("hazard") == null:
-		# only count "ore" for non-hazard non-resource tiles
+	elif terrain_info.get("is_ore", false):
 		ore += 1
 
 	cargo += cargo_value
 
 	source_layer.set_cell(tile_pos, -1)
 	
+	# track for save system (only terrain-layer breaks, not hazards)
+	if source_layer == terrain and terrain.has_method("mark_cleared"):
+		terrain.mark_cleared(tile_pos)
+		
 	# wake hazards that might want to flow into the new empty cell
 	if terrain.has_method("_wake_neighbors"):
 		terrain._wake_neighbors(tile_pos)
@@ -482,50 +505,7 @@ func play_impact_sound(tile_data):
 
 	drill_impact_sound.play()
 	
-func update_upgrade_ui():
 
-	if not can_upgrade:
-
-		ui_upgrade_title.text = ""
-		ui_upgrade_cost.text = ""
-		ui_upgrade_resources.text = ""
-
-		return
-
-	var next_level = drill_power + 1
-
-	if not UpgradeData.DRILL_UPGRADES.has(next_level):
-
-		ui_upgrade_title.text = "MAX POWER"
-		ui_upgrade_cost.text = ""
-		ui_upgrade_resources.text = ""
-
-		return
-
-	var data = UpgradeData.DRILL_UPGRADES[next_level]
-
-	ui_upgrade_title.text = "DRILL POWER " + str(next_level)
-
-	ui_upgrade_cost.text = "$" + str(money) + " / $" + str(data["money"])
-
-	var resource_text = ""
-
-	for resource_name in data["resources"]:
-
-		var required = data["resources"][resource_name]
-		var owned = resources.get(resource_name, 0)
-
-		resource_text += (
-			resource_name.capitalize()
-			+ ": "
-			+ str(owned)
-			+ " / "
-			+ str(required)
-			+ "\n"
-		)
-
-	ui_upgrade_resources.text = resource_text
-	
 func update_player_light():
 
 	if not player_light:
@@ -777,3 +757,68 @@ func update_health(delta: float) -> void:
 		$Sprite2D.modulate = Color(1.5, 0.4, 0.4, 1.0)
 	else:
 		$Sprite2D.modulate = Color.WHITE
+
+
+func build_player_save() -> Dictionary:
+
+	return {
+		"position_x": global_position.x,
+		"position_y": global_position.y,
+		"money": money,
+		"drill_power": drill_power,
+		"sonar_range": sonar_range,
+		"fuel": fuel,
+		"health": health,
+		"cargo": cargo,
+		"ore": ore,
+		"drill_swivel_tier": drill_swivel_tier,
+		"drill_direction": [drill_direction.x, drill_direction.y],
+		"resources": resources,
+		"max_cargo": max_cargo,
+		"max_fuel": max_fuel
+	}
+
+
+func apply_player_save(save: Dictionary) -> void:
+
+	if save.has("position_x") and save.has("position_y"):
+		global_position = Vector2(save["position_x"], save["position_y"])
+
+	money = save.get("money", 0)
+	drill_power = save.get("drill_power", 1)
+	sonar_range = save.get("sonar_range", 8)
+	fuel = save.get("fuel", max_fuel)
+	health = save.get("health", max_health)
+	cargo = save.get("cargo", 0)
+	ore = save.get("ore", 0)
+	drill_swivel_tier = save.get("drill_swivel_tier", 1)
+	max_cargo = save.get("max_cargo", 20)
+	max_fuel = save.get("max_fuel", 100.0)
+	if save.has("drill_direction"):
+		var d: Array = save["drill_direction"]
+		drill_direction = Vector2i(int(d[0]), int(d[1]))
+		
+	if save.has("resources"):
+		for key in save["resources"].keys():
+			resources[key] = int(save["resources"][key])
+
+
+func _handle_swivel_input() -> void:
+
+	# tier 2: must be stationary AND not drilling
+	if drill_swivel_tier == 2:
+		if is_drilling:
+			return
+		if velocity.length() > 0.1:
+			return
+
+	# tier 3: no restrictions
+
+	if Input.is_action_just_pressed("drill_left"):
+		drill_direction = Vector2i.LEFT
+
+	elif Input.is_action_just_pressed("drill_down"):
+		drill_direction = Vector2i.DOWN
+
+	elif Input.is_action_just_pressed("drill_right"):
+		drill_direction = Vector2i.RIGHT

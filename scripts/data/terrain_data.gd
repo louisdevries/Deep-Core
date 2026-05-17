@@ -40,7 +40,8 @@ const TERRAIN_TYPES = {
 		"name": "Basic Ore",
 		"required_power": 2,
 		"cargo": 1,
-		"resource": null
+		"resource": null,
+		"is_ore": true
 	},
 
 	# COPPER
