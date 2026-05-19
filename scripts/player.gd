@@ -20,6 +20,27 @@ const ResourceData = preload("res://scripts/data/resource_data.gd")
 @export var metal_break_sound: AudioStream
 @export var crystal_break_sound: AudioStream
 
+# GRAVITY
+@export var gravity: float = 800.0          # pixels/sec²
+@export var max_fall_speed: float = 600.0
+@export var thruster_force: float = 1100.0   # upward acceleration when thrusting
+@export var thruster_fuel_drain: float = 8.0   # fuel/sec while thrusting
+var is_thrusting: bool = false
+
+# CABLE PHYSICS
+var _cable_anchor: Vector2 = Vector2.ZERO
+var _cable_length: float = 0.0
+var _cable_angle: float = 0.0           # radians from straight down
+var _cable_angular_vel: float = 0.0
+@export var max_cable_length: float = 800.0   # 50 tiles * 16px
+@export var pendulum_damping: float = 2.5     # angular vel damping per sec
+@export var swing_input_force: float = 6.0    # how much L/R input affects swing
+@export var cable_extend_speed: float = 150.0 # pixels/sec for extending cable
+@export var cable_retract_speed: float = 200.0 # pixels/sec for retracting via thrusters
+
+# CABLE
+var cable_engaged: bool = false
+
 var hazard_layer: TileMapLayer
 
 const TILE_SOURCE_ID = 1
@@ -250,6 +271,7 @@ func _physics_process(delta):
 	
 	terrain.update_fog(global_position)
 	update_camera_shake()
+	_update_cable_visual()
 
 
 func handle_input():
@@ -283,22 +305,18 @@ func handle_input():
 	if drill_swivel_tier >= 2:
 		_handle_swivel_input()
 
+	if Input.is_action_just_pressed("cable_toggle"):
+		# only allow toggling while standing inside the refuel zone
+		if can_upgrade:    # can_upgrade is true while inside refuel zone
+			toggle_cable()
+
 
 func handle_movement(delta):
 
-	var direction = Vector2.ZERO
-	direction.x = Input.get_axis("ui_left", "ui_right")
-	direction.y = Input.get_axis("ui_up", "ui_down")
-
-	if direction.length() > 0:
-		last_direction = direction.normalized()
-		fuel -= fuel_drain_move * delta
-
-	# safety: fall back if move_speed is null
-	var speed: float = move_speed if move_speed != null else 200.0
-	velocity = direction.normalized() * speed
-
-	move_and_slide()
+	if cable_engaged:
+		_handle_cable_movement(delta)
+	else:
+		_handle_free_movement(delta)
 
 func world_to_tile(pos: Vector2) -> Vector2i:
 	var local_pos = terrain.to_local(pos)
@@ -775,7 +793,8 @@ func build_player_save() -> Dictionary:
 		"drill_direction": [drill_direction.x, drill_direction.y],
 		"resources": resources,
 		"max_cargo": max_cargo,
-		"max_fuel": max_fuel
+		"max_fuel": max_fuel,
+		"max_cable_length": max_cable_length,
 	}
 
 
@@ -793,6 +812,7 @@ func apply_player_save(save: Dictionary) -> void:
 	ore = save.get("ore", 0)
 	drill_swivel_tier = save.get("drill_swivel_tier", 1)
 	max_cargo = save.get("max_cargo", 20)
+	max_cable_length = save.get("max_cable_length", 800.0)
 	max_fuel = save.get("max_fuel", 100.0)
 	if save.has("drill_direction"):
 		var d: Array = save["drill_direction"]
@@ -822,3 +842,126 @@ func _handle_swivel_input() -> void:
 
 	elif Input.is_action_just_pressed("drill_right"):
 		drill_direction = Vector2i.RIGHT
+
+func toggle_cable() -> void:
+
+	cable_engaged = not cable_engaged
+
+	if cable_engaged:
+		# capture anchor position when engaging
+		_cable_anchor = _find_refuel_anchor()
+		print("Cable anchor: ", _cable_anchor, " | Refuel sprite global: ", _find_refuel_anchor())
+		_cable_length = global_position.distance_to(_cable_anchor)
+		_cable_angle = atan2(global_position.x - _cable_anchor.x, global_position.y - _cable_anchor.y)
+		_cable_angular_vel = 0.0
+		print("Cable engaged from anchor: ", _cable_anchor)
+	else:
+		print("Cable disengaged")
+
+func _find_refuel_anchor() -> Vector2:
+
+	var refuel := get_tree().get_first_node_in_group("refuel_zone")
+	if not refuel:
+		return Vector2(0, 0)
+
+	# prefer the visible sprite as the anchor, fall back to the area origin
+	var sprite := refuel.get_node_or_null("Sprite2D") as Node2D
+	if sprite:
+		return sprite.global_position
+
+	return refuel.global_position
+
+func _handle_free_movement(delta):
+
+	var direction_x: float = Input.get_axis("ui_left", "ui_right")
+
+	is_thrusting = Input.is_action_pressed("ui_up") and fuel > 0.0
+
+	velocity.x = direction_x * move_speed
+
+	if abs(direction_x) > 0.0:
+		fuel -= fuel_drain_move * delta
+
+	if is_thrusting:
+		velocity.y -= thruster_force * delta
+		fuel -= thruster_fuel_drain * delta
+	else:
+		velocity.y += gravity * delta
+
+	velocity.y = min(velocity.y, max_fall_speed)
+	velocity.y = max(velocity.y, -max_fall_speed)
+
+	move_and_slide()
+
+	if direction_x != 0:
+		last_direction = Vector2(direction_x, 0)
+
+
+func _handle_cable_movement(delta):
+
+	var direction_x: float = Input.get_axis("ui_left", "ui_right")
+	is_thrusting = Input.is_action_pressed("ui_up") and fuel > 0.0
+	var pulling_down: bool = Input.is_action_pressed("ui_down")
+
+	# --- pendulum physics ---
+	# angular acceleration from gravity: -g/L * sin(angle)
+	var angular_accel: float = -(gravity / max(_cable_length, 1.0)) * sin(_cable_angle)
+
+	# player input pushes the swing
+	angular_accel += direction_x * swing_input_force
+
+	# damping (more damping while drilling)
+	var damping: float = pendulum_damping
+	if is_drilling:
+		damping *= 3.0
+
+	# apply
+	_cable_angular_vel += angular_accel * delta
+	_cable_angular_vel *= exp(-damping * delta)   # exponential damping
+	_cable_angle += _cable_angular_vel * delta
+
+	# --- cable length changes ---
+	if is_thrusting:
+		# retract: drill rises
+		_cable_length = max(0.0, _cable_length - cable_retract_speed * delta)
+		fuel -= thruster_fuel_drain * delta
+	elif pulling_down:
+		# extend deliberately (faster than gravity could anyway)
+		_cable_length = min(max_cable_length, _cable_length + cable_extend_speed * delta)
+
+	# --- horizontal input drains fuel even when swinging ---
+	if abs(direction_x) > 0.0:
+		fuel -= fuel_drain_move * delta
+
+	# --- compute new position ---
+	var target_pos: Vector2 = _cable_anchor + Vector2(
+		sin(_cable_angle) * _cable_length,
+		cos(_cable_angle) * _cable_length
+	)
+
+	# use move_and_slide via velocity for collision response
+	var movement: Vector2 = target_pos - global_position
+	velocity = movement / max(delta, 0.001)
+	move_and_slide()
+
+	# if collision pushed us, recompute cable state from actual position
+	# this prevents tunneling and lets pendulum react to hitting walls
+	var actual_offset: Vector2 = global_position - _cable_anchor
+	_cable_length = actual_offset.length()
+	if _cable_length > 0.1:
+		_cable_angle = atan2(actual_offset.x, actual_offset.y)
+
+func _update_cable_visual() -> void:
+
+	var cable_line: Line2D = get_node_or_null("CableLine")
+	if not cable_line:
+		return
+
+	if cable_engaged:
+		cable_line.visible = true
+		# convert anchor to local space relative to player
+		cable_line.clear_points()
+		cable_line.add_point(to_local(_cable_anchor))
+		cable_line.add_point(Vector2.ZERO)
+	else:
+		cable_line.visible = false

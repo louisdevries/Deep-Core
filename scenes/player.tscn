@@ -64,3 +64,8 @@ stream = ExtResource("5_qlg0r")
 stream = ExtResource("5_qlg0r")
 
 [node name="DrillImpactSound" type="AudioStreamPlayer2D" parent="." unique_id=337378397]
+
+[node name="CableLine" type="Line2D" parent="." unique_id=957338347]
+z_index = -1
+width = 2.0
+default_color = Color(0.24840015, 0.24840018, 0.24840015, 1)

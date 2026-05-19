@@ -6,6 +6,18 @@
 [ext_resource type="Script" uid="uid://cg2054q45vhjb" path="res://scripts/refuel.gd" id="5_c01mt"]
 [ext_resource type="PackedScene" uid="uid://t7bj8oythijm" path="res://scenes/upgrade_menu.tscn" id="5_vcsgt"]
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_UpgradeButton"]
+bg_color = Color(0.25, 0.55, 0.2, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0, 0, 0, 1)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_0bbpv"]
 bg_color = Color(1, 0, 0.025840001, 1)
 
@@ -49,7 +61,18 @@ offset_right = 119.0
 offset_bottom = 109.0
 text = "Cargo: 0 / 20"
 
-[node name="CopperLabel" type="Label" parent="UI" unique_id=601753533 groups=["ui_copper"]]
+[node name="UpgradeButton" type="Button" parent="UI" unique_id=1010101010 groups=["ui_upgrade_button"]]
+offset_left = -211.0
+offset_top = 27.0
+offset_right = 29.0
+offset_bottom = 79.0
+theme_override_colors/font_color = Color(0, 0, 0, 1)
+theme_override_styles/normal = SubResource("StyleBoxFlat_UpgradeButton")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_UpgradeButton")
+theme_override_styles/hover = SubResource("StyleBoxFlat_UpgradeButton")
+text = "OPEN UPGRADES"
+
+[node name="CopperLabel" type="Label" parent="UI" unique_id=601753533 groups=["ui_crystal"]]
 offset_left = 26.0
 offset_top = 139.0
 offset_right = 124.0
@@ -96,8 +119,8 @@ offset_right = 414.0
 offset_bottom = 51.0
 text = "Drill Direction"
 
-[node name="RefuelZone" type="Area2D" parent="." unique_id=943789613]
-position = Vector2(-38, 341)
+[node name="RefuelZone" type="Area2D" parent="." unique_id=943789613 groups=["refuel_zone"]]
+position = Vector2(-38, 349)
 script = ExtResource("5_c01mt")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="RefuelZone" unique_id=215024760]

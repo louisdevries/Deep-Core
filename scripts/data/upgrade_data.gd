@@ -68,7 +68,20 @@ const UPGRADES := {
 			{ "money": 700,  "resources": { "copper": 8 } },
 			{ "money": 2000, "resources": { "iron": 12 } },
 		]
-	}
+	},
+
+	"cable_length": {
+		"name": "Cable Length",
+		"category": CATEGORY_EQUIPMENT,
+		"description": "How far down the cable can extend.",
+		"player_var": "max_cable_length",
+		"tiers": [
+			{ "money": 300,  "resources": {} },
+			{ "money": 1000, "resources": { "copper": 10 } },
+			{ "money": 3000, "resources": { "iron": 15 } },
+			{ "money": 8000, "resources": { "iron": 20, "crystal": 10 } },
+		]
+	},
 }
 
 
@@ -78,7 +91,8 @@ const STARTING_VALUES := {
 	"drill_swivel_tier": 1,
 	"sonar_range": 8,
 	"max_cargo": 20,
-	"max_fuel": 100.0
+	"max_fuel": 100.0,
+	"max_cable_length": 800.0
 }
 
 
@@ -89,5 +103,6 @@ const TIER_INCREMENTS := {
 	"drill_swivel_tier": 1,
 	"sonar_range": 3,    # +3 tiles per tier
 	"max_cargo": 15,     # +15 per tier
-	"max_fuel": 50.0     # +50 per tier
+	"max_fuel": 50.0,     # +50 per tier
+	"max_cable_length": 400.0    # +25 tiles per upgrade
 }
