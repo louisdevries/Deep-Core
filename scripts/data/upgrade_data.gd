@@ -92,7 +92,7 @@ const STARTING_VALUES := {
 	"sonar_range": 8,
 	"max_cargo": 20,
 	"max_fuel": 100.0,
-	"max_cable_length": 800.0
+	"max_cable_length": 1200.0
 }
 
 

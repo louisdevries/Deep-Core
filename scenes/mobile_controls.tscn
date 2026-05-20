@@ -38,7 +38,31 @@ action = "ui_accept"
 visibility_mode = 1
 
 [node name="SonarButton" type="TouchScreenButton" parent="." unique_id=611506982]
-position = Vector2(560, 965)
+position = Vector2(560, 819)
 texture_normal = ExtResource("1_k8ypl")
 action = "sonar"
+visibility_mode = 1
+
+[node name="GearButton3" type="TouchScreenButton" parent="." unique_id=1347821093]
+position = Vector2(545, 330)
+texture_normal = ExtResource("1_k8ypl")
+action = "set_gear_3"
+visibility_mode = 1
+
+[node name="GearButton2" type="TouchScreenButton" parent="." unique_id=1347821094]
+position = Vector2(549, 441)
+texture_normal = ExtResource("1_k8ypl")
+action = "set_gear_2"
+visibility_mode = 1
+
+[node name="GearButton1" type="TouchScreenButton" parent="." unique_id=1347821095]
+position = Vector2(549, 543)
+texture_normal = ExtResource("1_k8ypl")
+action = "set_gear_1"
+visibility_mode = 1
+
+[node name="CableToggleButton" type="TouchScreenButton" parent="." unique_id=1347821096]
+position = Vector2(462, 954)
+texture_normal = ExtResource("1_k8ypl")
+action = "cable_toggle"
 visibility_mode = 1

@@ -160,6 +160,12 @@ func fill_fog():
 # -------------------------
 # FOG UPDATE (CALL FROM PLAYER)
 # -------------------------
+
+# How many empty tiles of a shaft sky light travels down before fading out.
+const SKY_SHAFT_DEPTH := 6
+# How many solid tiles below a sky-connected opening receive light bleed.
+const SKY_BLEED := 3
+
 func update_fog(player_global_pos: Vector2):
 
 	if not fog_layer:
@@ -171,7 +177,27 @@ func update_fog(player_global_pos: Vector2):
 	# full fog reset
 	fill_fog()
 
-	# clear fog around the player (light radius)
+	# --- Sky lighting ---
+	# For every column, trace downward from y=0.  Empty tiles (drilled shafts
+	# or open air) are directly lit by the sky.  The first solid tile hit plus
+	# SKY_BLEED tiles below it get ambient light from the opening above.
+	for x in range(-world_width, world_width):
+		var y := 0
+		var open_tiles := 0
+		while y < world_depth:
+			if get_cell_atlas_coords(Vector2i(x, y)) == Vector2i(-1, -1):
+				if open_tiles < SKY_SHAFT_DEPTH:
+					fog_layer.set_cell(Vector2i(x, y), -1)
+				open_tiles += 1
+				y += 1
+			else:
+				if open_tiles < SKY_SHAFT_DEPTH:
+					for b in range(SKY_BLEED):
+						if y + b < world_depth:
+							fog_layer.set_cell(Vector2i(x, y + b), -1)
+				break
+
+	# --- Player light radius ---
 	for x in range(player_tile.x - light_radius, player_tile.x + light_radius + 1):
 		for y in range(player_tile.y - light_radius, player_tile.y + light_radius + 1):
 
@@ -185,7 +211,7 @@ func update_fog(player_global_pos: Vector2):
 
 			fog_layer.set_cell(target, -1)
 
-	# also clear fog on any tiles the sonar is currently revealing
+	# --- Sonar reveals ---
 	var expired: Array = []
 
 	for tile_pos in sonar_revealed.keys():

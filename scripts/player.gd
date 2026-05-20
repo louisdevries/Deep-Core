@@ -30,9 +30,8 @@ var is_thrusting: bool = false
 # CABLE PHYSICS
 var _cable_anchor: Vector2 = Vector2.ZERO
 var _cable_length: float = 0.0
-var _cable_angle: float = 0.0           # radians from straight down
-var _cable_angular_vel: float = 0.0
-@export var max_cable_length: float = 800.0   # 50 tiles * 16px
+
+@export var max_cable_length: float = 1200.0  # 75 tiles * 16px
 @export var pendulum_damping: float = 2.5     # angular vel damping per sec
 @export var swing_input_force: float = 6.0    # how much L/R input affects swing
 @export var cable_extend_speed: float = 150.0 # pixels/sec for extending cable
@@ -40,6 +39,7 @@ var _cable_angular_vel: float = 0.0
 
 # CABLE
 var cable_engaged: bool = false
+var _cable_wrap_points: Array[Vector2] = []
 
 var hazard_layer: TileMapLayer
 
@@ -286,6 +286,13 @@ func handle_input():
 
 	if Input.is_action_just_pressed("ui_page_down"):
 		drill_gear = max(drill_gear - 1, 1)
+
+	if Input.is_action_just_pressed("set_gear_1"):
+		drill_gear = 1
+	if Input.is_action_just_pressed("set_gear_2"):
+		drill_gear = 2
+	if Input.is_action_just_pressed("set_gear_3"):
+		drill_gear = 3
 		
 	if Input.is_action_just_pressed("sonar"):
 		use_sonar()
@@ -812,7 +819,7 @@ func apply_player_save(save: Dictionary) -> void:
 	ore = save.get("ore", 0)
 	drill_swivel_tier = save.get("drill_swivel_tier", 1)
 	max_cargo = save.get("max_cargo", 20)
-	max_cable_length = save.get("max_cable_length", 800.0)
+	max_cable_length = save.get("max_cable_length", 1200.0)
 	max_fuel = save.get("max_fuel", 100.0)
 	if save.has("drill_direction"):
 		var d: Array = save["drill_direction"]
@@ -846,17 +853,11 @@ func _handle_swivel_input() -> void:
 func toggle_cable() -> void:
 
 	cable_engaged = not cable_engaged
+	_cable_wrap_points.clear()
 
 	if cable_engaged:
-		# capture anchor position when engaging
 		_cable_anchor = _find_refuel_anchor()
-		print("Cable anchor: ", _cable_anchor, " | Refuel sprite global: ", _find_refuel_anchor())
-		_cable_length = global_position.distance_to(_cable_anchor)
-		_cable_angle = atan2(global_position.x - _cable_anchor.x, global_position.y - _cable_anchor.y)
-		_cable_angular_vel = 0.0
-		print("Cable engaged from anchor: ", _cable_anchor)
-	else:
-		print("Cable disengaged")
+		_cable_length = min(global_position.distance_to(_cable_anchor), max_cable_length)
 
 func _find_refuel_anchor() -> Vector2:
 
@@ -897,59 +898,111 @@ func _handle_free_movement(delta):
 		last_direction = Vector2(direction_x, 0)
 
 
+func _get_effective_anchor() -> Vector2:
+	return _cable_wrap_points.back() if _cable_wrap_points.size() > 0 else _cable_anchor
+
+func _find_wrap_corner(hit_pos: Vector2, hit_normal: Vector2, from_anchor: Vector2) -> Vector2:
+	var space_state := get_world_2d().direct_space_state
+	var tile_pos: Vector2i = terrain.local_to_map(terrain.to_local(hit_pos - hit_normal * 1.0))
+	var half := Vector2(terrain.tile_set.tile_size) * 0.5
+	var tile_center: Vector2 = terrain.to_global(terrain.map_to_local(tile_pos))
+
+	var corners := [
+		tile_center + Vector2(-half.x, -half.y),
+		tile_center + Vector2( half.x, -half.y),
+		tile_center + Vector2(-half.x,  half.y),
+		tile_center + Vector2( half.x,  half.y),
+	]
+
+	var best_corner := hit_pos
+	var best_dist := INF
+	for c: Vector2 in corners:
+		var q := PhysicsRayQueryParameters2D.create(from_anchor, c)
+		q.exclude = [self]
+		if not space_state.intersect_ray(q).is_empty():
+			continue
+		var d := c.distance_to(hit_pos)
+		if d < best_dist:
+			best_dist = d
+			best_corner = c
+	return best_corner
+
+func _update_cable_wrap_points() -> void:
+	var space_state := get_world_2d().direct_space_state
+
+	# Unwrap: remove the most recent wrap point if the previous anchor now has
+	# line-of-sight to the player (i.e. the corner is no longer in the way).
+	while _cable_wrap_points.size() > 0:
+		var prev: Vector2 = _cable_wrap_points[-2] if _cable_wrap_points.size() > 1 else _cable_anchor
+		var unwrap_q := PhysicsRayQueryParameters2D.create(prev, global_position)
+		unwrap_q.exclude = [self]
+		if space_state.intersect_ray(unwrap_q).is_empty():
+			_cable_wrap_points.pop_back()
+		else:
+			break
+
+	# Wrap: if the direct path from the current effective anchor to the player
+	# is blocked, find the tile corner the cable bends around.
+	if _cable_wrap_points.size() >= 8:
+		return
+	var ea := _get_effective_anchor()
+	var q := PhysicsRayQueryParameters2D.create(ea, global_position)
+	q.exclude = [self]
+	var hit := space_state.intersect_ray(q)
+	if not hit.is_empty():
+		var corner := _find_wrap_corner(hit["position"], hit["normal"], ea)
+		if corner.distance_to(ea) > 2.0 and corner.distance_to(global_position) > 2.0:
+			_cable_wrap_points.append(corner)
+
+func _get_rope_path_length() -> float:
+	var total := 0.0
+	var prev := _cable_anchor
+	for wp: Vector2 in _cable_wrap_points:
+		total += prev.distance_to(wp)
+		prev = wp
+	total += prev.distance_to(global_position)
+	return total
+
 func _handle_cable_movement(delta):
+
+	_update_cable_wrap_points()
 
 	var direction_x: float = Input.get_axis("ui_left", "ui_right")
 	is_thrusting = Input.is_action_pressed("ui_up") and fuel > 0.0
-	var pulling_down: bool = Input.is_action_pressed("ui_down")
 
-	# --- pendulum physics ---
-	# angular acceleration from gravity: -g/L * sin(angle)
-	var angular_accel: float = -(gravity / max(_cable_length, 1.0)) * sin(_cable_angle)
+	# Player moves freely under normal physics. The cable only acts when taut.
+	velocity.x = direction_x * move_speed
 
-	# player input pushes the swing
-	angular_accel += direction_x * swing_input_force
-
-	# damping (more damping while drilling)
-	var damping: float = pendulum_damping
-	if is_drilling:
-		damping *= 3.0
-
-	# apply
-	_cable_angular_vel += angular_accel * delta
-	_cable_angular_vel *= exp(-damping * delta)   # exponential damping
-	_cable_angle += _cable_angular_vel * delta
-
-	# --- cable length changes ---
 	if is_thrusting:
-		# retract: drill rises
-		_cable_length = max(0.0, _cable_length - cable_retract_speed * delta)
+		velocity.y -= thruster_force * delta
 		fuel -= thruster_fuel_drain * delta
-	elif pulling_down:
-		# extend deliberately (faster than gravity could anyway)
-		_cable_length = min(max_cable_length, _cable_length + cable_extend_speed * delta)
+	else:
+		velocity.y += gravity * delta
 
-	# --- horizontal input drains fuel even when swinging ---
+	velocity.y = clamp(velocity.y, -max_fall_speed, max_fall_speed)
+
 	if abs(direction_x) > 0.0:
 		fuel -= fuel_drain_move * delta
 
-	# --- compute new position ---
-	var target_pos: Vector2 = _cable_anchor + Vector2(
-		sin(_cable_angle) * _cable_length,
-		cos(_cable_angle) * _cable_length
-	)
-
-	# use move_and_slide via velocity for collision response
-	var movement: Vector2 = target_pos - global_position
-	velocity = movement / max(delta, 0.001)
 	move_and_slide()
 
-	# if collision pushed us, recompute cable state from actual position
-	# this prevents tunneling and lets pendulum react to hitting walls
-	var actual_offset: Vector2 = global_position - _cable_anchor
-	_cable_length = actual_offset.length()
-	if _cable_length > 0.1:
-		_cable_angle = atan2(actual_offset.x, actual_offset.y)
+	if direction_x != 0:
+		last_direction = Vector2(direction_x, 0)
+
+	# Rope constraint: if the total path length through all wrap corners exceeds
+	# the cable length, pull the player back along the last segment and cancel
+	# any velocity component that would stretch the rope further.
+	var rope_len := _get_rope_path_length()
+	if rope_len > _cable_length:
+		var ea := _get_effective_anchor()
+		var to_player := global_position - ea
+		var seg := to_player.length()
+		if seg > 0.001:
+			var rope_dir := to_player / seg
+			global_position -= rope_dir * (rope_len - _cable_length)
+			var radial_vel := velocity.dot(rope_dir)
+			if radial_vel > 0.0:
+				velocity -= rope_dir * radial_vel
 
 func _update_cable_visual() -> void:
 
@@ -959,9 +1012,10 @@ func _update_cable_visual() -> void:
 
 	if cable_engaged:
 		cable_line.visible = true
-		# convert anchor to local space relative to player
 		cable_line.clear_points()
 		cable_line.add_point(to_local(_cable_anchor))
+		for wp: Vector2 in _cable_wrap_points:
+			cable_line.add_point(to_local(wp))
 		cable_line.add_point(Vector2.ZERO)
 	else:
 		cable_line.visible = false
