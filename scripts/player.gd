@@ -27,16 +27,13 @@ const ResourceData = preload("res://scripts/data/resource_data.gd")
 @export var thruster_fuel_drain: float = 8.0   # fuel/sec while thrusting
 var is_thrusting: bool = false
 
-# CABLE PHYSICS
+
 var _cable_anchor: Vector2 = Vector2.ZERO
-var _cable_length: float = 0.0
-
-@export var max_cable_length: float = 1200.0  # 75 tiles * 16px
-@export var pendulum_damping: float = 2.5     # angular vel damping per sec
-@export var swing_input_force: float = 6.0    # how much L/R input affects swing
-@export var cable_extend_speed: float = 150.0 # pixels/sec for extending cable
-@export var cable_retract_speed: float = 200.0 # pixels/sec for retracting via thrusters
-
+var _cable_paid_out: float = 200.0          # how much rope is deployed (slack)
+@export var initial_cable_slack: float = 200.0    # how much rope is already out at engage time
+@export var max_cable_length: float = 800.0
+@export var cable_extend_speed: float = 150.0    # pixels/sec
+@export var cable_retract_speed: float = 150.0
 # CABLE
 var cable_engaged: bool = false
 var _cable_wrap_points: Array[Vector2] = []
@@ -281,12 +278,6 @@ func handle_input():
 	is_drilling = Input.is_action_pressed("ui_accept")
 
 	# Gear controls
-	if Input.is_action_just_pressed("ui_page_up"):
-		drill_gear = min(drill_gear + 1, 3)
-
-	if Input.is_action_just_pressed("ui_page_down"):
-		drill_gear = max(drill_gear - 1, 1)
-
 	if Input.is_action_just_pressed("set_gear_1"):
 		drill_gear = 1
 	if Input.is_action_just_pressed("set_gear_2"):
@@ -853,12 +844,17 @@ func _handle_swivel_input() -> void:
 func toggle_cable() -> void:
 
 	cable_engaged = not cable_engaged
-	_cable_wrap_points.clear()
 
 	if cable_engaged:
 		_cable_anchor = _find_refuel_anchor()
-		_cable_length = min(global_position.distance_to(_cable_anchor), max_cable_length)
 
+		# start with a comfortable amount of slack
+		var current_dist: float = global_position.distance_to(_cable_anchor)
+		_cable_paid_out = max(current_dist + initial_cable_slack, initial_cable_slack)
+
+		print("Cable engaged. Anchor: ", _cable_anchor, " | paid out: ", _cable_paid_out)
+	else:
+		print("Cable disengaged")
 func _find_refuel_anchor() -> Vector2:
 
 	var refuel := get_tree().get_first_node_in_group("refuel_zone")
@@ -893,9 +889,15 @@ func _handle_free_movement(delta):
 	velocity.y = max(velocity.y, -max_fall_speed)
 
 	move_and_slide()
+	_clamp_to_camera_bounds()
 
 	if direction_x != 0:
 		last_direction = Vector2(direction_x, 0)
+
+
+func _clamp_to_camera_bounds() -> void:
+	const HALF_W: float = 6.0
+	global_position.x = clamp(global_position.x, camera.limit_left + HALF_W, camera.limit_right - HALF_W)
 
 
 func _get_effective_anchor() -> Vector2:
@@ -965,13 +967,20 @@ func _get_rope_path_length() -> float:
 
 func _handle_cable_movement(delta):
 
-	_update_cable_wrap_points()
+	# --- winch input: change cable length ---
+	if Input.is_action_pressed("cable_winch_out"):
+		_cable_paid_out = min(max_cable_length, _cable_paid_out + cable_extend_speed * delta)
+	if Input.is_action_pressed("cable_winch_in"):
+		_cable_paid_out = max(0.0, _cable_paid_out - cable_retract_speed * delta)
 
+	# --- regular movement (same as free movement) ---
 	var direction_x: float = Input.get_axis("ui_left", "ui_right")
 	is_thrusting = Input.is_action_pressed("ui_up") and fuel > 0.0
 
-	# Player moves freely under normal physics. The cable only acts when taut.
 	velocity.x = direction_x * move_speed
+
+	if abs(direction_x) > 0.0:
+		fuel -= fuel_drain_move * delta
 
 	if is_thrusting:
 		velocity.y -= thruster_force * delta
@@ -979,30 +988,29 @@ func _handle_cable_movement(delta):
 	else:
 		velocity.y += gravity * delta
 
-	velocity.y = clamp(velocity.y, -max_fall_speed, max_fall_speed)
-
-	if abs(direction_x) > 0.0:
-		fuel -= fuel_drain_move * delta
+	velocity.y = min(velocity.y, max_fall_speed)
+	velocity.y = max(velocity.y, -max_fall_speed)
 
 	move_and_slide()
+	_clamp_to_camera_bounds()
+
+	# --- cable constraint: clamp distance to anchor ---
+	var to_anchor: Vector2 = global_position - _cable_anchor
+	var dist: float = to_anchor.length()
+
+	if dist > _cable_paid_out:
+		# pull player back to within cable length
+		var clamped: Vector2 = _cable_anchor + to_anchor.normalized() * _cable_paid_out
+		global_position = clamped
+
+		# kill velocity component pointing away from anchor (so we don't keep "pulling" against the rope)
+		var away_dir: Vector2 = to_anchor.normalized()
+		var away_velocity: float = velocity.dot(away_dir)
+		if away_velocity > 0:
+			velocity -= away_dir * away_velocity
 
 	if direction_x != 0:
 		last_direction = Vector2(direction_x, 0)
-
-	# Rope constraint: if the total path length through all wrap corners exceeds
-	# the cable length, pull the player back along the last segment and cancel
-	# any velocity component that would stretch the rope further.
-	var rope_len := _get_rope_path_length()
-	if rope_len > _cable_length:
-		var ea := _get_effective_anchor()
-		var to_player := global_position - ea
-		var seg := to_player.length()
-		if seg > 0.001:
-			var rope_dir := to_player / seg
-			global_position -= rope_dir * (rope_len - _cable_length)
-			var radial_vel := velocity.dot(rope_dir)
-			if radial_vel > 0.0:
-				velocity -= rope_dir * radial_vel
 
 func _update_cable_visual() -> void:
 
