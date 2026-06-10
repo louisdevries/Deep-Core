@@ -57,3 +57,29 @@ func clear_save() -> void:
 	if has_save():
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
 		data = {}
+
+func clear_world_only() -> void:
+
+	if data.is_empty():
+		# nothing saved yet — nothing to wipe
+		return
+
+	# remove world-specific keys; keep everything else
+	data.erase("world_seed")
+	data.erase("cleared_cells")
+	data.erase("hazards")
+
+	# also reset player position so they spawn correctly
+	data.erase("position_x")
+	data.erase("position_y")
+
+	# fuel/health/cargo are run-state — reset them too so the player gets a fresh start to the run
+	data["fuel"] = data.get("max_fuel", 100.0)
+	data["health"] = data.get("max_health", 100.0)
+	data["cargo"] = 0
+	data["ore"] = 0
+
+	# persist the modified save back to disk
+	save_game(data)
+
+	print("World-only reset: world data cleared, progress kept")

@@ -82,6 +82,15 @@ const UPGRADES := {
 			{ "money": 8000, "resources": { "iron": 20, "crystal": 10 } },
 		]
 	},
+	"thrusters": {
+		"name": "Thrusters",
+		"category": CATEGORY_EQUIPMENT,
+		"description": "Vertical thrust for short bursts. Fast ascent at the cost of fuel.",
+		"player_var": "has_thrusters",
+		"tiers": [
+			{ "money": 1500, "resources": { "copper": 15, "iron": 5 } },
+		]
+	},
 }
 
 

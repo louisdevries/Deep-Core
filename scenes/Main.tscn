@@ -5,6 +5,7 @@
 [ext_resource type="PackedScene" uid="uid://btctoe0vkivh1" path="res://scenes/mobile_controls.tscn" id="4_rarhs"]
 [ext_resource type="Script" uid="uid://cg2054q45vhjb" path="res://scripts/refuel.gd" id="5_c01mt"]
 [ext_resource type="PackedScene" uid="uid://t7bj8oythijm" path="res://scenes/upgrade_menu.tscn" id="5_vcsgt"]
+[ext_resource type="PackedScene" uid="uid://dogf42auvxg8y" path="res://scenes/pause_menu.tscn" id="6_nxtc6"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_UpgradeButton"]
 bg_color = Color(0.25, 0.55, 0.2, 1)
@@ -136,6 +137,8 @@ texture = ExtResource("2_0bbpv")
 position = Vector2(34, 22)
 
 [node name="MobileControls" parent="." unique_id=2106365054 instance=ExtResource("4_rarhs")]
-script = null
 
 [node name="UpgradeMenu" parent="." unique_id=836497758 instance=ExtResource("5_vcsgt")]
+
+[node name="PauseMenu" parent="." unique_id=100186306 instance=ExtResource("6_nxtc6")]
+visible = false

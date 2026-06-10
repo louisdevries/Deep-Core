@@ -21,21 +21,19 @@ const ResourceData = preload("res://scripts/data/resource_data.gd")
 @export var crystal_break_sound: AudioStream
 
 # GRAVITY
-@export var gravity: float = 800.0          # pixels/sec²
+@export var gravity: float = 800.0
 @export var max_fall_speed: float = 600.0
-@export var thruster_force: float = 1100.0   # upward acceleration when thrusting
-@export var thruster_fuel_drain: float = 8.0   # fuel/sec while thrusting
+@export var thruster_force: float = 1100.0
+@export var thruster_fuel_drain: float = 8.0
 var is_thrusting: bool = false
 
-
-var _cable_anchor: Vector2 = Vector2.ZERO
-var _cable_paid_out: float = 200.0          # how much rope is deployed (slack)
-@export var initial_cable_slack: float = 200.0    # how much rope is already out at engage time
-@export var max_cable_length: float = 800.0
-@export var cable_extend_speed: float = 150.0    # pixels/sec
-@export var cable_retract_speed: float = 150.0
 # CABLE
-var cable_engaged: bool = false
+var _cable_anchor: Vector2 = Vector2.ZERO
+var _cable_paid_out: float = 200.0
+@export var initial_cable_slack: float = 200.0
+@export var max_cable_length: float = 800.0
+@export var cable_extend_speed: float = 150.0
+@export var cable_retract_speed: float = 150.0
 var _cable_wrap_points: Array[Vector2] = []
 
 var hazard_layer: TileMapLayer
@@ -62,11 +60,14 @@ var current_depth = 0
 # HEALTH
 @export var max_health: float = 100.0
 var health: float = 100.0
-var health_regen_rate: float = 3.0           # HP per second when safe
+var health_regen_rate: float = 3.0
 var time_since_damage: float = 0.0
-var regen_delay: float = 4.0                 # seconds before regen kicks in
+var regen_delay: float = 4.0
 var is_dead: bool = false
 var damage_flash_timer: float = 0.0
+
+# THRUSTERS (upgrade-gated)
+var has_thrusters: bool = false
 
 # RESPAWN
 var spawn_position: Vector2
@@ -74,21 +75,150 @@ var spawn_position: Vector2
 # UI
 var ui_health_bar
 
-# NEW RESOURCE STORAGE
+# RESOURCE STORAGE - all material types
 var resources = {
 	"copper": 0,
+	"tin": 0,
+	"coal": 0,
+	"sulfur": 0,
 	"iron": 0,
-	"crystal": 0
+	"silver": 0,
+	"aluminum": 0,
+	"lead": 0,
+	"zinc": 0,
+	"gold": 0,
+	"platinum": 0,
+	"titanium": 0,
+	"tungsten": 0,
+	"crystal": 0,
+	"ruby": 0,
+	"sapphire": 0,
+	"emerald": 0,
+	"diamond": 0,
+	"obsidian": 0,
+	"uranium": 0,
+	"mythril": 0,
+	"adamantium": 0,
 }
 
+# ============================
+# SONAR TARGETS - all valuable tiles + hazards
+# (updated for row-based atlas layout)
+# ============================
 const SONAR_TARGETS := {
-	Vector2i(4, 0): Color(1.0, 0.7, 0.3, 1.0),    # Basic Ore - amber
-	Vector2i(5, 0): Color(1.0, 0.5, 0.1, 1.0),    # Copper - orange
-	Vector2i(6, 0): Color(0.8, 0.85, 0.9, 1.0),   # Iron - silver
-	Vector2i(7, 0): Color(0.2, 1.0, 1.0, 1.0),    # Crystal - cyan
-	Vector2i(8, 0): Color(1.0, 0.2, 0.0, 1.0),    # Lava - red (warning)
-	Vector2i(9, 0): Color(0.3, 1.0, 0.2, 1.0),    # Gas - green (warning)
+	# Row 1 - ores
+	Vector2i(0, 1): Color(1.0, 0.7, 0.3, 1.0),     # Basic Ore - amber
+	Vector2i(1, 1): Color(1.0, 0.5, 0.1, 1.0),     # Copper - bright orange
+	Vector2i(2, 1): Color(0.9, 0.9, 0.85, 1.0),    # Tin - pale silver
+	Vector2i(3, 1): Color(0.3, 0.3, 0.3, 1.0),     # Coal - dark grey
+	Vector2i(4, 1): Color(0.95, 0.9, 0.3, 1.0),    # Sulfur - mustard yellow
+
+	# Row 2 - metals
+	Vector2i(0, 2): Color(0.8, 0.85, 0.9, 1.0),    # Iron - slate
+	Vector2i(1, 2): Color(0.95, 0.95, 0.95, 1.0),  # Silver - bright cool white
+	Vector2i(2, 2): Color(0.75, 0.8, 0.85, 1.0),   # Aluminum - matte light
+	Vector2i(3, 2): Color(0.45, 0.5, 0.55, 1.0),   # Lead - dark blue-grey
+	Vector2i(4, 2): Color(0.6, 0.65, 0.7, 1.0),    # Zinc - medium grey
+
+	# Row 3 - precious
+	Vector2i(0, 3): Color(1.0, 0.85, 0.3, 1.0),    # Gold - warm yellow
+	Vector2i(1, 3): Color(0.95, 0.9, 0.85, 1.0),   # Platinum - cream
+	Vector2i(2, 3): Color(0.6, 0.7, 0.8, 1.0),     # Titanium - steel-blue
+	Vector2i(3, 3): Color(0.35, 0.4, 0.45, 1.0),   # Tungsten - very dark cool
+
+	# Row 4 - gems
+	Vector2i(0, 4): Color(0.2, 1.0, 1.0, 1.0),     # Crystal - cyan
+	Vector2i(1, 4): Color(0.95, 0.2, 0.2, 1.0),    # Ruby - saturated red
+	Vector2i(2, 4): Color(0.2, 0.4, 0.95, 1.0),    # Sapphire - deep blue
+	Vector2i(3, 4): Color(0.15, 0.75, 0.45, 1.0),  # Emerald - rich green
+	Vector2i(4, 4): Color(0.8, 0.95, 1.0, 1.0),    # Diamond - pale luminous
+
+	# Row 5 - hazards (warning colors)
+	Vector2i(0, 5): Color(1.0, 0.2, 0.0, 1.0),     # Lava - red
+	Vector2i(1, 5): Color(0.3, 1.0, 0.2, 1.0),     # Gas - green warning
+	Vector2i(2, 5): Color(0.7, 0.9, 1.0, 1.0),     # Ice - pale icy blue
+	Vector2i(3, 5): Color(0.7, 0.95, 0.2, 1.0),    # Acid - lime warning
+
+	# Row 6 - specials
+	Vector2i(0, 6): Color(0.4, 0.3, 0.5, 1.0),     # Obsidian - violet-black
+	Vector2i(1, 6): Color(0.3, 0.9, 0.3, 1.0),     # Uranium - radioactive green
+	Vector2i(2, 6): Color(0.7, 0.9, 1.0, 1.0),     # Mythril - luminous pale blue
+	Vector2i(3, 6): Color(0.4, 0.5, 0.6, 1.0),     # Adamantium - dark steel
 }
+
+
+# ============================
+# TILE → CATEGORY (data-driven sounds and particles)
+# Each tile maps to a "material category" used for picking sounds and effects.
+# ============================
+const TILE_CATEGORY := {
+	# Row 0 - terrain
+	Vector2i(0, 0): "soft",      # grass
+	Vector2i(1, 0): "soft",      # dirt
+	Vector2i(2, 0): "stone",     # stone
+	Vector2i(3, 0): "stone",     # hard stone
+	Vector2i(4, 0): "stone",     # deep stone
+
+	# Row 1 - common ores
+	Vector2i(0, 1): "ore",       # basic ore
+	Vector2i(1, 1): "metal",     # copper
+	Vector2i(2, 1): "metal",     # tin
+	Vector2i(3, 1): "ore",       # coal
+	Vector2i(4, 1): "ore",       # sulfur
+
+	# Row 2 - metals
+	Vector2i(0, 2): "metal",     # iron
+	Vector2i(1, 2): "metal",     # silver
+	Vector2i(2, 2): "metal",     # aluminum
+	Vector2i(3, 2): "metal",     # lead
+	Vector2i(4, 2): "metal",     # zinc
+
+	# Row 3 - precious
+	Vector2i(0, 3): "metal",     # gold
+	Vector2i(1, 3): "metal",     # platinum
+	Vector2i(2, 3): "metal",     # titanium
+	Vector2i(3, 3): "metal",     # tungsten
+
+	# Row 4 - gems
+	Vector2i(0, 4): "crystal",   # crystal
+	Vector2i(1, 4): "crystal",   # ruby
+	Vector2i(2, 4): "crystal",   # sapphire
+	Vector2i(3, 4): "crystal",   # emerald
+	Vector2i(4, 4): "crystal",   # diamond
+
+	# Row 5 - hazards (no break sound usually but defined for safety)
+	Vector2i(0, 5): "hazard",    # lava
+	Vector2i(1, 5): "hazard",    # gas
+	Vector2i(2, 5): "stone",     # ice (sounds like stone)
+	Vector2i(3, 5): "hazard",    # acid
+
+	# Row 6 - specials
+	Vector2i(0, 6): "crystal",   # obsidian (glassy)
+	Vector2i(1, 6): "metal",     # uranium
+	Vector2i(2, 6): "metal",     # mythril
+	Vector2i(3, 6): "metal",     # adamantium
+}
+
+# Particle colors per category
+const CATEGORY_PARTICLE_COLOR := {
+	"soft":    Color.SADDLE_BROWN,
+	"stone":   Color.DIM_GRAY,
+	"ore":     Color.ORANGE,
+	"metal":   Color.LIGHT_SLATE_GRAY,
+	"crystal": Color.CYAN,
+	"hazard":  Color.RED,
+}
+
+# Drill pitch per category
+const CATEGORY_DRILL_PITCH := {
+	"soft":    1.0,
+	"stone":   0.85,
+	"ore":     1.0,
+	"metal":   0.95,
+	"crystal": 1.3,
+	"hazard":  0.7,
+}
+
 
 var ui_fuel_bar
 var ui_gear_label
@@ -109,8 +239,9 @@ var drill_sound
 var drill_idle_sound
 var drill_loop_sound
 var drill_impact_sound
+
 # DRILL SWIVEL
-var drill_swivel_tier: int = 1            # 1=down only, 2=stop-to-swivel, 3=free swivel
+var drill_swivel_tier: int = 1
 var drill_direction: Vector2i = Vector2i.DOWN
 
 var cargo = 0
@@ -120,8 +251,8 @@ var revealed_tiles = {}
 
 # SONAR
 var sonar_range: int = 8
-var sonar_terrain_duration: float = 3.0   # how long terrain stays revealed
-var sonar_marker_duration: float = 6.0    # resource pulses last longer
+var sonar_terrain_duration: float = 3.0
+var sonar_marker_duration: float = 6.0
 var sonar_cooldown: float = 8.0
 var sonar_cooldown_timer: float = 0.0
 var sonar_markers_container: Node2D
@@ -129,7 +260,7 @@ var sonar_markers_container: Node2D
 # SONAR sweep state
 var sonar_active: bool = false
 var sonar_sweep_time: float = 0.0
-var sonar_sweep_duration: float = 0.8    # how long the ring takes to expand fully
+var sonar_sweep_duration: float = 0.8
 var sonar_last_radius: float = 0.0
 var sonar_center_tile: Vector2i
 
@@ -143,72 +274,52 @@ func _ready():
 	print("terrain node: ", terrain.name if terrain else "null")
 	print("terrain has script: ", terrain.get_script() != null if terrain else "n/a")
 	print("terrain tile under player:", terrain.get_cell_atlas_coords(world_to_tile(global_position)))
-	print("TERRAIN NODES:")
-	for n in get_tree().get_nodes_in_group("terrain"):
-		print(n.name, " class:", n.get_class())
-	var all_terrain = get_tree().get_nodes_in_group("terrain")
-	print("nodes in 'terrain' group: ", all_terrain.size())
-	for t in all_terrain:
-		print("  - ", t.name, " | script: ", t.get_script() != null)
-
-	var all_bg = get_tree().get_nodes_in_group("terrain_background")
-	print("nodes in 'terrain_background' group: ", all_bg.size())
-	for t in all_bg:
-		print("  - ", t.name, " | script: ", t.get_script() != null)
 	print("==========================")
-		
+
 	ui_fuel_bar = get_tree().get_first_node_in_group("ui_fuel")
 	ui_gear_label = get_tree().get_first_node_in_group("ui_gear")
-	ui_money_label = get_tree().get_first_node_in_group("ui_money")	
+	ui_money_label = get_tree().get_first_node_in_group("ui_money")
 	ui_cargo_label = get_tree().get_first_node_in_group("ui_cargo")
 	ui_copper_label = get_tree().get_first_node_in_group("ui_copper")
 	ui_iron_label = get_tree().get_first_node_in_group("ui_iron")
-	ui_crystal_label = get_tree().get_first_node_in_group("ui_crystal")	
+	ui_crystal_label = get_tree().get_first_node_in_group("ui_crystal")
 	ui_sonar_label = get_tree().get_first_node_in_group("ui_sonar")
 	ui_health_bar = get_tree().get_first_node_in_group("ui_health")
 	hazard_layer = get_tree().get_first_node_in_group("hazards")
 	ui_drill_dir_label = get_tree().get_first_node_in_group("ui_drill_dir")
 	spawn_position = global_position
 	health = max_health
-# container for sonar markers (so we can clear them all at once)
+
 	sonar_markers_container = Node2D.new()
 	sonar_markers_container.name = "SonarMarkers"
 	sonar_markers_container.z_index = 10
 	get_tree().current_scene.add_child.call_deferred(sonar_markers_container)
 	darkness_overlay = get_tree().get_first_node_in_group("darkness_overlay")
-	
+
 	drill_particles = $DrillParticles
-
 	camera = $Camera2D
-
 	drill_sound = $DrillSound
 	drill_idle_sound = $DrillIdleSound
 	drill_impact_sound = $DrillImpactSound
-	
+
 	# restore player state from save (if any)
-	var save := SaveSystem.data
+	var save: Dictionary = SaveSystem.data
 	if not save.is_empty():
 		apply_player_save(save)
-		
+
 	drill_idle_sound.play()
 
 
 func _physics_process(delta):
 
-	print(
-		"player global: ",
-		global_position,
-		" tile: ",
-		world_to_tile(global_position)
-	)
 	handle_input()
-	
+
 	update_sonar_sweep(delta)
 	if sonar_cooldown_timer > 0.0:
 		sonar_cooldown_timer = max(0.0, sonar_cooldown_timer - delta)
 	check_hazard_contact(delta)
 	update_health(delta)
-	
+
 	if fuel <= 0 or is_dead:
 		velocity = Vector2.ZERO
 		return
@@ -229,11 +340,11 @@ func _physics_process(delta):
 		ui_gear_label.text = "Gear: " + str(drill_gear)
 
 	if ui_money_label:
-		ui_money_label.text = "$" + str(money)	
+		ui_money_label.text = "$" + str(money)
 
 	if ui_cargo_label:
 		ui_cargo_label.text = "Cargo: " + str(cargo) + " / " + str(max_cargo)
-		
+
 	if ui_copper_label:
 		ui_copper_label.text = "Copper: " + str(resources["copper"])
 
@@ -242,30 +353,29 @@ func _physics_process(delta):
 
 	if ui_crystal_label:
 		ui_crystal_label.text = "Crystal: " + str(resources["crystal"])
-		
+
 	if ui_sonar_label:
 		if sonar_cooldown_timer > 0.0:
 			ui_sonar_label.text = "Sonar: %.1fs" % sonar_cooldown_timer
 		else:
 			ui_sonar_label.text = "Sonar: READY"
-					
+
 	if ui_health_bar:
 		ui_health_bar.value = health
-	
+
 	if ui_drill_dir_label:
 		match drill_direction:
 			Vector2i.LEFT:  ui_drill_dir_label.text = "Drill: ←"
 			Vector2i.DOWN:  ui_drill_dir_label.text = "Drill: ↓"
 			Vector2i.RIGHT: ui_drill_dir_label.text = "Drill: →"
-			
+
 	current_depth = int(global_position.y / 16)
 	update_player_light()
 	update_darkness()
-	
+
 	if terrain.has_method("set_depth_tint"):
-		terrain.set_depth_tint(current_depth)		
-	
-	
+		terrain.set_depth_tint(current_depth)
+
 	terrain.update_fog(global_position)
 	update_camera_shake()
 	_update_cable_visual()
@@ -284,41 +394,83 @@ func handle_input():
 		drill_gear = 2
 	if Input.is_action_just_pressed("set_gear_3"):
 		drill_gear = 3
-		
+
 	if Input.is_action_just_pressed("sonar"):
 		use_sonar()
 
 	# Audio transitions
 	if is_drilling and not was_drilling:
-
 		drill_idle_sound.volume_db = -6
 		drill_idle_sound.pitch_scale = 1.08
-
 	elif not is_drilling and was_drilling:
-
 		drill_idle_sound.volume_db = -12
 		drill_idle_sound.pitch_scale = 1.0
-		
+
 	# DRILL DIRECTION (swivel system)
 	if drill_swivel_tier >= 2:
-		_handle_swivel_input()
-
-	if Input.is_action_just_pressed("cable_toggle"):
-		# only allow toggling while standing inside the refuel zone
-		if can_upgrade:    # can_upgrade is true while inside refuel zone
-			toggle_cable()
+		_handle_swivel_input()	
 
 
-func handle_movement(delta):
+func handle_movement(delta: float) -> void:
 
-	if cable_engaged:
-		_handle_cable_movement(delta)
+	var direction_x: float = Input.get_axis("ui_left", "ui_right")
+	var winch_in: bool = Input.is_action_pressed("ui_up")
+	var winch_out: bool = Input.is_action_pressed("ui_down")
+
+	# thrusters (only if unlocked, and only on a dedicated key)
+	is_thrusting = has_thrusters and Input.is_action_pressed("thrust") and fuel > 0.0
+
+	# --- winch cable in/out ---
+	if winch_in:
+		_cable_paid_out = max(0.0, _cable_paid_out - cable_retract_speed * delta)
+	elif winch_out:
+		_cable_paid_out = min(max_cable_length, _cable_paid_out + cable_extend_speed * delta)
+
+	# --- horizontal: snappy ground-style movement (creates swing if at full extension) ---
+	velocity.x = direction_x * move_speed
+
+	if abs(direction_x) > 0.0:
+		fuel -= fuel_drain_move * delta
+
+	# --- vertical: gravity always applies; cable catches it ---
+	if is_thrusting:
+		# thrusters override the cable's hold
+		velocity.y -= thruster_force * delta
+		fuel -= thruster_fuel_drain * delta
 	else:
-		_handle_free_movement(delta)
+		velocity.y += gravity * delta
+
+	# cap vertical speed
+	velocity.y = min(velocity.y, max_fall_speed)
+	velocity.y = max(velocity.y, -max_fall_speed)
+
+	move_and_slide()
+	_clamp_to_camera_bounds()
+
+	# --- cable constraint: clamp player to within paid-out length of anchor ---
+	var to_player: Vector2 = global_position - _cable_anchor
+	var dist: float = to_player.length()
+
+	if dist > _cable_paid_out:
+		# pull player back onto the cable circle
+		var clamped: Vector2 = _cable_anchor + to_player.normalized() * _cable_paid_out
+		global_position = clamped
+
+		# kill velocity component pointing away from the anchor
+		# (this is what cancels gravity once the cable is taut)
+		var away_dir: Vector2 = to_player.normalized()
+		var away_velocity: float = velocity.dot(away_dir)
+		if away_velocity > 0:
+			velocity -= away_dir * away_velocity
+
+	if direction_x != 0:
+		last_direction = Vector2(direction_x, 0)
+
 
 func world_to_tile(pos: Vector2) -> Vector2i:
 	var local_pos = terrain.to_local(pos)
 	return terrain.local_to_map(local_pos)
+
 
 func drill(delta):
 
@@ -329,10 +481,8 @@ func drill(delta):
 
 	drill_timer = 0.0
 
-	# fuel usage scales with gear
 	fuel -= fuel_drain_drill * drill_gear * delta
 
-	# compute drill targets based on direction
 	var perpendicular_offset: int = 6
 	var depth_offset: int = 10
 
@@ -356,13 +506,12 @@ func drill(delta):
 	try_break_tile(world_to_tile(target_a))
 	try_break_tile(world_to_tile(target_b))
 
+
 func try_break_tile(tile_pos: Vector2i):
 
-	# try terrain first
 	var tile_data: Vector2i = terrain.get_cell_atlas_coords(tile_pos)
 	var source_layer: TileMapLayer = terrain
 
-	# if terrain is empty here, check hazard layer
 	if tile_data == Vector2i(-1, -1) and hazard_layer:
 		tile_data = hazard_layer.get_cell_atlas_coords(tile_pos)
 		source_layer = hazard_layer
@@ -394,6 +543,9 @@ func try_break_tile(tile_pos: Vector2i):
 	var resource_type = terrain_info["resource"]
 
 	if resource_type != null:
+		# create the bucket on demand for any new resource type
+		if not resources.has(resource_type):
+			resources[resource_type] = 0
 		resources[resource_type] += 1
 	elif terrain_info.get("is_ore", false):
 		ore += 1
@@ -401,14 +553,21 @@ func try_break_tile(tile_pos: Vector2i):
 	cargo += cargo_value
 
 	source_layer.set_cell(tile_pos, -1)
-	
+
 	# track for save system (only terrain-layer breaks, not hazards)
 	if source_layer == terrain and terrain.has_method("mark_cleared"):
 		terrain.mark_cleared(tile_pos)
-		
+
 	# wake hazards that might want to flow into the new empty cell
 	if terrain.has_method("_wake_neighbors"):
 		terrain._wake_neighbors(tile_pos)
+
+
+# ============================
+# DATA-DRIVEN PARTICLE / SOUND HELPERS
+# ============================
+func _get_category(tile_data: Vector2i) -> String:
+	return TILE_CATEGORY.get(tile_data, "stone")
 
 
 func spawn_drill_particles(tile_pos, tile_data):
@@ -417,50 +576,24 @@ func spawn_drill_particles(tile_pos, tile_data):
 		return
 
 	var world_pos = terrain.map_to_local(tile_pos)
-
 	drill_particles.global_position = terrain.to_global(world_pos)
 
-	match tile_data:
-
-		Vector2i(0, 0):
-			drill_particles.modulate = Color.SADDLE_BROWN
-
-		Vector2i(1, 0):
-			drill_particles.modulate = Color.GRAY
-
-		Vector2i(2, 0):
-			drill_particles.modulate = Color.DIM_GRAY
-
-		Vector2i(3, 0):
-			drill_particles.modulate = Color.GOLDENROD
-
-		Vector2i(4, 0):
-			drill_particles.modulate = Color.ORANGE
-
-		Vector2i(5, 0):
-			drill_particles.modulate = Color.LIGHT_SLATE_GRAY
-
-		Vector2i(6, 0):
-			drill_particles.modulate = Color.CYAN
+	var category: String = _get_category(tile_data)
+	drill_particles.modulate = CATEGORY_PARTICLE_COLOR.get(category, Color.DIM_GRAY)
 
 	drill_particles.restart()
-
 	drill_particles.emitting = true
 
 
 func update_camera_shake():
 
 	if shake_strength > 0:
-
 		camera.offset = Vector2(
 			randf_range(-shake_strength, shake_strength),
 			randf_range(-shake_strength, shake_strength)
 		)
-
 		shake_strength = lerp(shake_strength, 0.0, 0.2)
-
 	else:
-
 		camera.offset = Vector2.ZERO
 
 
@@ -469,88 +602,57 @@ func play_drill_sound(tile_data):
 	if not drill_sound:
 		return
 
-	match tile_data:
-
-		Vector2i(0, 0):
-			drill_sound.pitch_scale = 1.0
-
-		Vector2i(1, 0):
-			drill_sound.pitch_scale = 0.9
-
-		Vector2i(2, 0):
-			drill_sound.pitch_scale = 0.7
-
-		Vector2i(3, 0):
-			drill_sound.pitch_scale = 1.1
-
-		Vector2i(4, 0):
-			drill_sound.pitch_scale = 1.15
-
-		Vector2i(5, 0):
-			drill_sound.pitch_scale = 0.85
-
-		Vector2i(6, 0):
-			drill_sound.pitch_scale = 1.3
+	var category: String = _get_category(tile_data)
+	drill_sound.pitch_scale = CATEGORY_DRILL_PITCH.get(category, 1.0)
 
 	drill_sound.play()
 
 
 func play_impact_sound(tile_data):
 
-	match tile_data:
+	var category: String = _get_category(tile_data)
+	var stream: AudioStream = null
 
-		Vector2i(0, 0):
-			drill_impact_sound.stream = dirt_break_sound
-
-		Vector2i(1, 0):
-			drill_impact_sound.stream = stone_break_sound
-
-		Vector2i(2, 0):
-			drill_impact_sound.stream = hard_stone_break_sound
-
-		Vector2i(3, 0), Vector2i(4, 0), Vector2i(5, 0):
-			drill_impact_sound.stream = metal_break_sound
-
-		Vector2i(6, 0):
-			drill_impact_sound.stream = crystal_break_sound
-
+	match category:
+		"soft":
+			stream = dirt_break_sound
+		"stone":
+			stream = stone_break_sound
+		"ore":
+			stream = hard_stone_break_sound
+		"metal":
+			stream = metal_break_sound
+		"crystal":
+			stream = crystal_break_sound
 		_:
 			return
 
-	drill_impact_sound.pitch_scale = randf_range(0.92, 1.08)
+	if not stream:
+		return
 
+	drill_impact_sound.stream = stream
+	drill_impact_sound.pitch_scale = randf_range(0.92, 1.08)
 	drill_impact_sound.play()
-	
+
 
 func update_player_light():
 
 	if not player_light:
 		return
 
-	# surface = weak light
-	# deep underground = strong light
-
 	var t = clamp((current_depth - 5) / 60.0, 0.0, 1.0)
-
 	player_light.energy = lerp(0.15, 1.4, t)
+
 
 func update_darkness():
 
 	if not darkness_overlay:
 		return
 
-	# starts darkening after surface
 	var t = clamp((current_depth - 5) / 120.0, 0.0, 1.0)
-
-	# brightness range
 	var brightness = lerp(1.0, 0.18, t)
 
-	darkness_overlay.color = Color(
-		brightness,
-		brightness,
-		brightness,
-		1.0
-	)
+	darkness_overlay.color = Color(brightness, brightness, brightness, 1.0)
 
 
 func use_sonar() -> void:
@@ -560,7 +662,6 @@ func use_sonar() -> void:
 
 	sonar_cooldown_timer = sonar_cooldown
 
-	# clear leftover markers from a previous ping
 	for child in sonar_markers_container.get_children():
 		child.queue_free()
 
@@ -571,20 +672,18 @@ func use_sonar() -> void:
 
 	print("Sonar sweep started")
 
+
 func spawn_sonar_marker(tile_pos: Vector2i, color: Color) -> void:
 
 	var marker := Sprite2D.new()
 
-	# build a small bright square texture procedurally
 	var img := Image.create(12, 12, false, Image.FORMAT_RGBA8)
 	img.fill(color)
 	marker.texture = ImageTexture.create_from_image(img)
 
-	# position at the tile's center, in world space
 	var local_pos: Vector2 = terrain.map_to_local(tile_pos)
 	marker.global_position = terrain.to_global(local_pos)
 
-	# pulsing tween for visibility through fog
 	sonar_markers_container.add_child(marker)
 
 	var tween := marker.create_tween().set_loops()
@@ -599,8 +698,8 @@ func clear_sonar_markers() -> void:
 
 	for child in sonar_markers_container.get_children():
 		child.queue_free()
-		
-		
+
+
 func update_sonar_sweep(delta: float) -> void:
 
 	if not sonar_active:
@@ -609,13 +708,9 @@ func update_sonar_sweep(delta: float) -> void:
 	sonar_sweep_time += delta
 
 	var t: float = clamp(sonar_sweep_time / sonar_sweep_duration, 0.0, 1.0)
-
-	# ease-out so the ring decelerates as it reaches max range (feels natural)
 	var eased: float = 1.0 - pow(1.0 - t, 2.0)
-
 	var current_radius: float = eased * float(sonar_range)
 
-	# stamp the new ring band into the terrain's reveal dict
 	if terrain.has_method("sonar_reveal_ring"):
 		terrain.sonar_reveal_ring(
 			sonar_center_tile,
@@ -624,17 +719,15 @@ func update_sonar_sweep(delta: float) -> void:
 			sonar_terrain_duration
 		)
 
-	# spawn resource markers for any new valuable tiles in the band
 	spawn_markers_in_ring(sonar_last_radius, current_radius)
 
 	sonar_last_radius = current_radius
 
 	if t >= 1.0:
 		sonar_active = false
-
-		# auto-clear markers after the linger duration
 		get_tree().create_timer(sonar_marker_duration).timeout.connect(clear_sonar_markers)
-		
+
+
 func spawn_markers_in_ring(inner: float, outer: float) -> void:
 
 	var r_int: int = int(ceil(outer))
@@ -648,10 +741,8 @@ func spawn_markers_in_ring(inner: float, outer: float) -> void:
 			if dist < inner or dist > outer:
 				continue
 
-			# check terrain first
 			var tile: Vector2i = terrain.get_cell_atlas_coords(pos)
 
-			# fall back to hazard layer
 			if tile == Vector2i(-1, -1) and hazard_layer:
 				tile = hazard_layer.get_cell_atlas_coords(pos)
 
@@ -659,7 +750,8 @@ func spawn_markers_in_ring(inner: float, outer: float) -> void:
 				continue
 
 			spawn_sonar_marker(pos, SONAR_TARGETS[tile])
-			
+
+
 func take_damage(amount: float, source: String = "") -> void:
 
 	if is_dead:
@@ -669,14 +761,14 @@ func take_damage(amount: float, source: String = "") -> void:
 	time_since_damage = 0.0
 	damage_flash_timer = 0.15
 
-	# camera shake on hit
 	shake_strength = max(shake_strength, amount * 0.15)
 
 	print("Took ", amount, " damage from ", source, " | HP: ", health)
 
 	if health <= 0.0:
 		die()
-		
+
+
 func die() -> void:
 
 	is_dead = true
@@ -684,14 +776,12 @@ func die() -> void:
 
 	print("=== PLAYER DIED ===")
 
-	# wipe cargo and carried resources (money stays - it's in the bank)
+	# wipe cargo and all carried resources (money stays - banked)
 	cargo = 0
 	ore = 0
-	resources["copper"] = 0
-	resources["iron"] = 0
-	resources["crystal"] = 0
+	for key in resources.keys():
+		resources[key] = 0
 
-	# brief pause then respawn
 	get_tree().create_timer(1.5).timeout.connect(respawn)
 
 
@@ -704,8 +794,8 @@ func respawn() -> void:
 	is_dead = false
 
 	print("Respawned at base")
-	
-	
+
+
 func check_hazard_contact(delta: float) -> void:
 
 	if is_dead:
@@ -755,8 +845,8 @@ func check_hazard_contact(delta: float) -> void:
 
 	if fuel_dmg > 0.0:
 		fuel = max(0.0, fuel - fuel_dmg * delta)
-		
-		
+
+
 func update_health(delta: float) -> void:
 
 	if is_dead:
@@ -767,7 +857,6 @@ func update_health(delta: float) -> void:
 	if time_since_damage >= regen_delay and health < max_health:
 		health = min(max_health, health + health_regen_rate * delta)
 
-	# red flash sprite tint when hit
 	if damage_flash_timer > 0.0:
 		damage_flash_timer -= delta
 		$Sprite2D.modulate = Color(1.5, 0.4, 0.4, 1.0)
@@ -793,6 +882,7 @@ func build_player_save() -> Dictionary:
 		"max_cargo": max_cargo,
 		"max_fuel": max_fuel,
 		"max_cable_length": max_cable_length,
+		"has_thrusters": has_thrusters,
 	}
 
 
@@ -810,14 +900,17 @@ func apply_player_save(save: Dictionary) -> void:
 	ore = save.get("ore", 0)
 	drill_swivel_tier = save.get("drill_swivel_tier", 1)
 	max_cargo = save.get("max_cargo", 20)
-	max_cable_length = save.get("max_cable_length", 1200.0)
+	max_cable_length = save.get("max_cable_length", 800.0)
 	max_fuel = save.get("max_fuel", 100.0)
+	has_thrusters = save.get("has_thrusters", false)
 	if save.has("drill_direction"):
 		var d: Array = save["drill_direction"]
 		drill_direction = Vector2i(int(d[0]), int(d[1]))
-		
+
 	if save.has("resources"):
 		for key in save["resources"].keys():
+			if not resources.has(key):
+				resources[key] = 0
 			resources[key] = int(save["resources"][key])
 
 
@@ -834,39 +927,28 @@ func _handle_swivel_input() -> void:
 
 	if Input.is_action_just_pressed("drill_left"):
 		drill_direction = Vector2i.LEFT
-
 	elif Input.is_action_just_pressed("drill_down"):
 		drill_direction = Vector2i.DOWN
-
 	elif Input.is_action_just_pressed("drill_right"):
 		drill_direction = Vector2i.RIGHT
 
-func toggle_cable() -> void:
 
-	cable_engaged = not cable_engaged
 
-	if cable_engaged:
-		_cable_anchor = _find_refuel_anchor()
 
-		# start with a comfortable amount of slack
-		var current_dist: float = global_position.distance_to(_cable_anchor)
-		_cable_paid_out = max(current_dist + initial_cable_slack, initial_cable_slack)
 
-		print("Cable engaged. Anchor: ", _cable_anchor, " | paid out: ", _cable_paid_out)
-	else:
-		print("Cable disengaged")
 func _find_refuel_anchor() -> Vector2:
 
 	var refuel := get_tree().get_first_node_in_group("refuel_zone")
 	if not refuel:
+		push_error("No node in 'refuel_zone' group — cable anchor will be wrong!")
 		return Vector2(0, 0)
 
-	# prefer the visible sprite as the anchor, fall back to the area origin
 	var sprite := refuel.get_node_or_null("Sprite2D") as Node2D
 	if sprite:
 		return sprite.global_position
 
 	return refuel.global_position
+
 
 func _handle_free_movement(delta):
 
@@ -903,6 +985,7 @@ func _clamp_to_camera_bounds() -> void:
 func _get_effective_anchor() -> Vector2:
 	return _cable_wrap_points.back() if _cable_wrap_points.size() > 0 else _cable_anchor
 
+
 func _find_wrap_corner(hit_pos: Vector2, hit_normal: Vector2, from_anchor: Vector2) -> Vector2:
 	var space_state := get_world_2d().direct_space_state
 	var tile_pos: Vector2i = terrain.local_to_map(terrain.to_local(hit_pos - hit_normal * 1.0))
@@ -929,11 +1012,10 @@ func _find_wrap_corner(hit_pos: Vector2, hit_normal: Vector2, from_anchor: Vecto
 			best_corner = c
 	return best_corner
 
+
 func _update_cable_wrap_points() -> void:
 	var space_state := get_world_2d().direct_space_state
 
-	# Unwrap: remove the most recent wrap point if the previous anchor now has
-	# line-of-sight to the player (i.e. the corner is no longer in the way).
 	while _cable_wrap_points.size() > 0:
 		var prev: Vector2 = _cable_wrap_points[-2] if _cable_wrap_points.size() > 1 else _cable_anchor
 		var unwrap_q := PhysicsRayQueryParameters2D.create(prev, global_position)
@@ -943,8 +1025,6 @@ func _update_cable_wrap_points() -> void:
 		else:
 			break
 
-	# Wrap: if the direct path from the current effective anchor to the player
-	# is blocked, find the tile corner the cable bends around.
 	if _cable_wrap_points.size() >= 8:
 		return
 	var ea := _get_effective_anchor()
@@ -956,6 +1036,7 @@ func _update_cable_wrap_points() -> void:
 		if corner.distance_to(ea) > 2.0 and corner.distance_to(global_position) > 2.0:
 			_cable_wrap_points.append(corner)
 
+
 func _get_rope_path_length() -> float:
 	var total := 0.0
 	var prev := _cable_anchor
@@ -965,15 +1046,14 @@ func _get_rope_path_length() -> float:
 	total += prev.distance_to(global_position)
 	return total
 
+
 func _handle_cable_movement(delta):
 
-	# --- winch input: change cable length ---
 	if Input.is_action_pressed("cable_winch_out"):
 		_cable_paid_out = min(max_cable_length, _cable_paid_out + cable_extend_speed * delta)
 	if Input.is_action_pressed("cable_winch_in"):
 		_cable_paid_out = max(0.0, _cable_paid_out - cable_retract_speed * delta)
 
-	# --- regular movement (same as free movement) ---
 	var direction_x: float = Input.get_axis("ui_left", "ui_right")
 	is_thrusting = Input.is_action_pressed("ui_up") and fuel > 0.0
 
@@ -994,16 +1074,14 @@ func _handle_cable_movement(delta):
 	move_and_slide()
 	_clamp_to_camera_bounds()
 
-	# --- cable constraint: clamp distance to anchor ---
+	# cable constraint: clamp distance to anchor
 	var to_anchor: Vector2 = global_position - _cable_anchor
 	var dist: float = to_anchor.length()
 
 	if dist > _cable_paid_out:
-		# pull player back to within cable length
 		var clamped: Vector2 = _cable_anchor + to_anchor.normalized() * _cable_paid_out
 		global_position = clamped
 
-		# kill velocity component pointing away from anchor (so we don't keep "pulling" against the rope)
 		var away_dir: Vector2 = to_anchor.normalized()
 		var away_velocity: float = velocity.dot(away_dir)
 		if away_velocity > 0:
@@ -1012,18 +1090,18 @@ func _handle_cable_movement(delta):
 	if direction_x != 0:
 		last_direction = Vector2(direction_x, 0)
 
+
 func _update_cable_visual() -> void:
 
 	var cable_line: Line2D = get_node_or_null("CableLine")
 	if not cable_line:
 		return
 
-	if cable_engaged:
-		cable_line.visible = true
-		cable_line.clear_points()
-		cable_line.add_point(to_local(_cable_anchor))
-		for wp: Vector2 in _cable_wrap_points:
-			cable_line.add_point(to_local(wp))
-		cable_line.add_point(Vector2.ZERO)
-	else:
-		cable_line.visible = false
+	cable_line.visible = true
+	cable_line.clear_points()
+	cable_line.add_point(to_local(_cable_anchor))
+	for wp: Vector2 in _cable_wrap_points:
+		cable_line.add_point(to_local(wp))
+	cable_line.add_point(Vector2.ZERO)
+
+	

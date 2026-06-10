@@ -4,9 +4,100 @@ extends TileMapLayer
 @export var world_depth = 200
 @export var light_radius := 6
 
-const TILE_SOURCE_ID = 0
+const TILE_SOURCE_ID = 1
 const FOG_SOURCE_ID = 1
 const FOG_TILE = Vector2i(0, 0)
+
+# ============================
+# DEPTH BANDS (define which tiles spawn at what depths)
+# ============================
+
+# Each band: { y_min, y_max, base_tile, deposits }
+# deposits = array of { tile, chance } - each rolled independently
+const DEPTH_BANDS = [
+	# Grass — single row of surface only
+	{
+		"y_min": 0,
+		"y_max": 1,
+		"base": Vector2i(0, 0),       # grass
+		"deposits": []
+	},
+	# Shallow dirt (now extends from y=1 to y=25)
+	{
+		"y_min": 1,
+		"y_max": 25,
+		"base": Vector2i(1, 0),       # dirt
+		"deposits": [
+			{ "tile": Vector2i(0, 1), "chance": 0.03 },    # basic ore
+			{ "tile": Vector2i(3, 1), "chance": 0.02 },    # coal
+		]
+	},
+	# Stone layer
+	{
+		"y_min": 25,
+		"y_max": 60,
+		"base": Vector2i(2, 0),       # stone
+		"deposits": [
+			{ "tile": Vector2i(0, 1), "chance": 0.015 },   # basic ore
+			{ "tile": Vector2i(1, 1), "chance": 0.025 },   # copper
+			{ "tile": Vector2i(2, 1), "chance": 0.015 },   # tin
+			{ "tile": Vector2i(3, 1), "chance": 0.02 },    # coal
+			{ "tile": Vector2i(4, 1), "chance": 0.01 },    # sulfur
+		]
+	},
+	# Hard stone layer (metals appear)
+	{
+		"y_min": 60,
+		"y_max": 110,
+		"base": Vector2i(3, 0),       # hard stone
+		"deposits": [
+			{ "tile": Vector2i(1, 1), "chance": 0.015 },   # copper (rarer here)
+			{ "tile": Vector2i(0, 2), "chance": 0.025 },   # iron
+			{ "tile": Vector2i(1, 2), "chance": 0.01 },    # silver
+			{ "tile": Vector2i(2, 2), "chance": 0.015 },   # aluminum
+			{ "tile": Vector2i(3, 2), "chance": 0.01 },    # lead
+			{ "tile": Vector2i(4, 2), "chance": 0.012 },   # zinc
+		]
+	},
+	# Deep stone (precious and first gems)
+	{
+		"y_min": 110,
+		"y_max": 160,
+		"base": Vector2i(4, 0),       # deep stone
+		"deposits": [
+			{ "tile": Vector2i(0, 2), "chance": 0.015 },   # iron (rarer)
+			{ "tile": Vector2i(0, 3), "chance": 0.012 },   # gold
+			{ "tile": Vector2i(1, 3), "chance": 0.006 },   # platinum
+			{ "tile": Vector2i(2, 3), "chance": 0.008 },   # titanium
+			{ "tile": Vector2i(0, 4), "chance": 0.01 },    # crystal
+			{ "tile": Vector2i(1, 4), "chance": 0.006 },   # ruby
+			{ "tile": Vector2i(2, 4), "chance": 0.005 },   # sapphire
+			{ "tile": Vector2i(3, 4), "chance": 0.005 },   # emerald
+		]
+	},
+	# Endgame depth (specials + rarest gems)
+	{
+		"y_min": 160,
+		"y_max": 200,
+		"base": Vector2i(4, 0),       # deep stone
+		"deposits": [
+			{ "tile": Vector2i(2, 3), "chance": 0.01 },    # titanium
+			{ "tile": Vector2i(3, 3), "chance": 0.008 },   # tungsten
+			{ "tile": Vector2i(0, 4), "chance": 0.005 },   # crystal
+			{ "tile": Vector2i(4, 4), "chance": 0.003 },   # diamond
+			{ "tile": Vector2i(0, 6), "chance": 0.005 },   # obsidian
+			{ "tile": Vector2i(1, 6), "chance": 0.004 },   # uranium
+			{ "tile": Vector2i(2, 6), "chance": 0.002 },   # mythril
+			{ "tile": Vector2i(3, 6), "chance": 0.001 },   # adamantium
+		]
+	}
+]
+
+# Hazard tile coordinates (centralised - update here when atlas changes)
+const HAZARD_LAVA  := Vector2i(0, 5)
+const HAZARD_GAS   := Vector2i(1, 5)
+const HAZARD_ICE   := Vector2i(2, 5)
+const HAZARD_ACID  := Vector2i(3, 5)
 
 var noise = FastNoiseLite.new()
 
@@ -17,16 +108,15 @@ var hazard_layer: TileMapLayer
 var sonar_revealed: Dictionary = {}
 
 # HAZARD FLOW SIM
-var active_hazards: Dictionary = {}    # Vector2i -> true (active set)
-var flow_tick_rate: float = 0.25       # seconds per tick (4 Hz)
+var active_hazards: Dictionary = {}
+var flow_tick_rate: float = 0.25
 var flow_tick_timer: float = 0.0
-var gas_dissipate_chance: float = 0.002   # per tick per cell - very slow
+var gas_dissipate_chance: float = 0.002
 
 var cave_zones = []
-
 var sonar_duration := 1.5
 var world_seed: int = 0
-var cleared_cells: Dictionary = {}   # Vector2i -> true (tiles the player has cleared)
+var cleared_cells: Dictionary = {}
 
 
 func _process(delta: float) -> void:
@@ -44,10 +134,9 @@ func _mark_hazard_active(pos: Vector2i) -> void:
 
 func _wake_neighbors(pos: Vector2i) -> void:
 
-	# wake hazards that might want to flow into this newly-empty cell
 	var checks: Array = [
-		Vector2i(pos.x, pos.y - 1),    # cell above (lava could fall in? no, but gas wants to rise into it)
-		Vector2i(pos.x, pos.y + 1),    # cell below (gas could sink? no, but consistent)
+		Vector2i(pos.x, pos.y - 1),
+		Vector2i(pos.x, pos.y + 1),
 		Vector2i(pos.x - 1, pos.y),
 		Vector2i(pos.x + 1, pos.y),
 	]
@@ -55,21 +144,25 @@ func _wake_neighbors(pos: Vector2i) -> void:
 	for c in checks:
 		if hazard_layer.get_cell_atlas_coords(c) != Vector2i(-1, -1):
 			active_hazards[c] = true
+
+
 # -------------------------
 # INIT
 # -------------------------
 func _ready():
 	randomize()
 
-	# check for saved data first
-	var save := SaveSystem.load_game() if SaveSystem.has_save() else {}
+	# explicit type annotation to fix the inference error
+	var save: Dictionary = {}
+	if SaveSystem.has_save():
+		save = SaveSystem.load_game()
 
 	if save.has("world_seed"):
 		world_seed = int(save["world_seed"])
 	else:
 		world_seed = randi()
 
-	seed(world_seed)            # makes randf/randi deterministic
+	seed(world_seed)
 	noise.seed = world_seed
 
 	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
@@ -93,13 +186,12 @@ func _ready():
 	fill_fog()
 	carve_caves()
 
-	# now apply saved overrides (player-cleared cells, current hazard positions)
 	if not save.is_empty():
 		_apply_world_save(save)
 
 
 # -------------------------
-# WORLD GENERATION
+# WORLD GENERATION (data-driven)
 # -------------------------
 func generate_world():
 
@@ -111,37 +203,29 @@ func generate_world():
 		for y in range(0, world_depth):
 
 			var pos := Vector2i(x, y)
+			var band: Dictionary = _get_band_for_depth(y)
+			var tile: Vector2i = band["base"]
 
-			var tile := Vector2i(1, 0)
-			var bg := Vector2i(1, 0)
+			# roll each deposit independently
+			for deposit in band["deposits"]:
+				if randf() < deposit["chance"]:
+					tile = deposit["tile"]
+					break    # one deposit per tile, first one wins
 
-			# surface
-			if y < 8:
-				tile = Vector2i(0, 0)
-				bg = Vector2i(0, 0)
-
-			# dirt
-			elif y < 25:
-				tile = Vector2i(1, 0)
-				bg = Vector2i(1, 0)
-
-				if randf() < 0.03:
-					tile = Vector2i(4, 0)
-
-			# stone
-			elif y < 60:
-				tile = Vector2i(2, 0)
-				bg = Vector2i(2, 0)
-
-			# deep stone
-			else:
-				tile = Vector2i(3, 0)
-				bg = Vector2i(3, 0)
-			
 			set_cell(pos, TILE_SOURCE_ID, tile)
-			
+
 			if background_layer:
-				background_layer.set_cell(pos, TILE_SOURCE_ID, bg)
+				background_layer.set_cell(pos, TILE_SOURCE_ID, band["base"])
+
+
+func _get_band_for_depth(y: int) -> Dictionary:
+
+	for band in DEPTH_BANDS:
+		if y >= band["y_min"] and y < band["y_max"]:
+			return band
+
+	# fallback: last band
+	return DEPTH_BANDS[-1]
 
 
 # -------------------------
@@ -158,13 +242,11 @@ func fill_fog():
 
 
 # -------------------------
-# FOG UPDATE (CALL FROM PLAYER)
+# FOG UPDATE
 # -------------------------
-
-# How many empty tiles of a shaft sky light travels down before fading out.
 const SKY_SHAFT_DEPTH := 6
-# How many solid tiles below a sky-connected opening receive light bleed.
 const SKY_BLEED := 3
+
 
 func update_fog(player_global_pos: Vector2):
 
@@ -174,13 +256,9 @@ func update_fog(player_global_pos: Vector2):
 	var player_tile := world_to_tile(player_global_pos)
 	var now := Time.get_ticks_msec()
 
-	# full fog reset
 	fill_fog()
 
-	# --- Sky lighting ---
-	# For every column, trace downward from y=0.  Empty tiles (drilled shafts
-	# or open air) are directly lit by the sky.  The first solid tile hit plus
-	# SKY_BLEED tiles below it get ambient light from the opening above.
+	# Sky lighting
 	for x in range(-world_width, world_width):
 		var y := 0
 		var open_tiles := 0
@@ -197,7 +275,7 @@ func update_fog(player_global_pos: Vector2):
 							fog_layer.set_cell(Vector2i(x, y + b), -1)
 				break
 
-	# --- Player light radius ---
+	# Player light radius
 	for x in range(player_tile.x - light_radius, player_tile.x + light_radius + 1):
 		for y in range(player_tile.y - light_radius, player_tile.y + light_radius + 1):
 
@@ -211,7 +289,7 @@ func update_fog(player_global_pos: Vector2):
 
 			fog_layer.set_cell(target, -1)
 
-	# --- Sonar reveals ---
+	# Sonar reveals
 	var expired: Array = []
 
 	for tile_pos in sonar_revealed.keys():
@@ -222,15 +300,17 @@ func update_fog(player_global_pos: Vector2):
 
 	for tile_pos in expired:
 		sonar_revealed.erase(tile_pos)
+
+
 # -------------------------
-# TILE CONVERSION (CRITICAL FIX)
+# TILE CONVERSION
 # -------------------------
 func world_to_tile(world_pos: Vector2) -> Vector2i:
 	return terrain.local_to_map(terrain.to_local(world_pos))
 
 
 # -------------------------
-# CAVES (UNCHANGED LOGIC, FIXED SAFETY)
+# CAVES
 # -------------------------
 func carve_caves():
 
@@ -243,7 +323,6 @@ func carve_caves():
 		var radius: int = zone["radius"]
 		var hazard: String = zone["hazard"]
 
-		# collect cells inside the cave (rough disc)
 		var cave_cells: Array = []
 
 		for x in range(center.x - radius, center.x + radius + 1):
@@ -254,33 +333,47 @@ func carve_caves():
 				if center.distance_to(Vector2(x, y)) > radius:
 					continue
 
-				# clear terrain (carve the cave)
 				set_cell(pos, -1)
 				cave_cells.append(pos)
 
-		# now fill with hazard
-		if hazard == "lava":
-			# lava settles at the BOTTOM of the cave (bottom 40%)
-			var max_y: int = -10000
-			for c in cave_cells:
-				if c.y > max_y:
-					max_y = c.y
+		# fill with hazard
+		match hazard:
 
-			var lava_threshold: int = max_y - int(radius * 0.4)
+			"lava":
+				_fill_cave_bottom(cave_cells, radius, HAZARD_LAVA)
 
-			for c in cave_cells:
-				if c.y >= lava_threshold:
-					hazard_layer.set_cell(c, TILE_SOURCE_ID, Vector2i(8, 0))
+			"acid":
+				_fill_cave_bottom(cave_cells, radius, HAZARD_ACID)
+
+			"gas":
+				for c in cave_cells:
+					hazard_layer.set_cell(c, TILE_SOURCE_ID, HAZARD_GAS)
 					_mark_hazard_active(c)
 
-		elif hazard == "gas":
-			# gas fills the WHOLE cave volume
-			for c in cave_cells:
-				hazard_layer.set_cell(c, TILE_SOURCE_ID, Vector2i(9, 0))
-				_mark_hazard_active(c)
+			"ice":
+				# ice fills the whole cave (frozen pocket)
+				for c in cave_cells:
+					hazard_layer.set_cell(c, TILE_SOURCE_ID, HAZARD_ICE)
+					# don't mark active - ice doesn't flow
+
+
+func _fill_cave_bottom(cave_cells: Array, radius: int, hazard_tile: Vector2i) -> void:
+
+	var max_y: int = -10000
+	for c in cave_cells:
+		if c.y > max_y:
+			max_y = c.y
+
+	var threshold: int = max_y - int(radius * 0.4)
+
+	for c in cave_cells:
+		if c.y >= threshold:
+			hazard_layer.set_cell(c, TILE_SOURCE_ID, hazard_tile)
+			_mark_hazard_active(c)
+
 
 # -------------------------
-# CAVE ZONES
+# CAVE ZONES (depth-aware hazard selection)
 # -------------------------
 func generate_cave_zones():
 
@@ -293,36 +386,48 @@ func generate_cave_zones():
 		var x: int = randi_range(-world_width, world_width)
 		var y: int = randi_range(35, world_depth)
 
-		# pick hazard based on depth
-		# shallow caves: empty or gas
-		# deep caves: gas or lava
-		var hazard: String = "none"
-		var depth_factor: float = clamp((y - 35) / 165.0, 0.0, 1.0)
-
-		var roll: float = randf()
-
-		if depth_factor < 0.3:
-			# shallow - mostly empty, occasional gas
-			if roll < 0.35:
-				hazard = "gas"
-		elif depth_factor < 0.7:
-			# mid - mix of gas and the first lava
-			if roll < 0.4:
-				hazard = "gas"
-			elif roll < 0.55:
-				hazard = "lava"
-		else:
-			# deep - lava heavy
-			if roll < 0.3:
-				hazard = "gas"
-			elif roll < 0.75:
-				hazard = "lava"
+		var hazard: String = _pick_cave_hazard(y)
 
 		cave_zones.append({
 			"pos": Vector2(x, y),
 			"radius": randi_range(5, 11),
 			"hazard": hazard
 		})
+
+
+func _pick_cave_hazard(depth: int) -> String:
+
+	var depth_factor: float = clamp((depth - 35) / 165.0, 0.0, 1.0)
+	var roll: float = randf()
+
+	if depth_factor < 0.3:
+		# shallow - mostly empty, gas, occasional ice
+		if roll < 0.30:
+			return "gas"
+		elif roll < 0.40:
+			return "ice"
+
+	elif depth_factor < 0.7:
+		# mid - gas, lava starts appearing, occasional ice and acid
+		if roll < 0.30:
+			return "gas"
+		elif roll < 0.45:
+			return "lava"
+		elif roll < 0.55:
+			return "ice"
+		elif roll < 0.60:
+			return "acid"
+
+	else:
+		# deep - lava heavy, acid more common
+		if roll < 0.20:
+			return "gas"
+		elif roll < 0.55:
+			return "lava"
+		elif roll < 0.75:
+			return "acid"
+
+	return "none"
 
 
 func has_line_of_sight(from_tile: Vector2i, to_tile: Vector2i) -> bool:
@@ -344,12 +449,12 @@ func has_line_of_sight(from_tile: Vector2i, to_tile: Vector2i) -> bool:
 			int(round(lerp(from_tile.y, to_tile.y, t)))
 		)
 
-		# if there's a solid tile → light is blocked
 		if get_cell_atlas_coords(check) != Vector2i(-1, -1):
 			return false
 
 	return true
-	
+
+
 func sonar_reveal_ring(center_tile: Vector2i, inner_radius: float, outer_radius: float, duration_sec: float) -> void:
 
 	var expiry := Time.get_ticks_msec() + int(duration_sec * 1000.0)
@@ -361,13 +466,17 @@ func sonar_reveal_ring(center_tile: Vector2i, inner_radius: float, outer_radius:
 			var pos := Vector2i(x, y)
 			var dist := center_tile.distance_to(pos)
 
-			# only stamp tiles in the ring band
 			if dist < inner_radius or dist > outer_radius:
 				continue
 
 			sonar_revealed[pos] = expiry
 
+
+# -------------------------
+# HAZARD FLOW
+# -------------------------
 func tick_hazards() -> void:
+
 	const MAX_PER_TICK := 400
 
 	if not hazard_layer:
@@ -376,63 +485,63 @@ func tick_hazards() -> void:
 	if active_hazards.is_empty():
 		return
 
-	# snapshot so we can modify the dict while iterating
 	var to_process: Array = active_hazards.keys()
 	var still_active: Dictionary = {}
-	
+
 	if to_process.size() > MAX_PER_TICK:
 		to_process.shuffle()
 		to_process = to_process.slice(0, MAX_PER_TICK)
-		
+
 	for pos in to_process:
 
 		var tile: Vector2i = hazard_layer.get_cell_atlas_coords(pos)
 
 		if tile == Vector2i(-1, -1):
-			continue   # cell was already cleared
+			continue
 
 		var moved: bool = false
 
-		if tile == Vector2i(8, 0):
-			moved = _flow_lava(pos)
+		match tile:
 
-		elif tile == Vector2i(9, 0):
-			# small chance to dissipate
-			if randf() < gas_dissipate_chance:
-				hazard_layer.set_cell(pos, -1)
-				_wake_neighbors(pos)
-				continue
-			moved = _flow_gas(pos)
+			HAZARD_LAVA:
+				moved = _flow_liquid(pos, HAZARD_LAVA)
 
-		# if it moved, both the source and destination need another tick
-		# if it didn't move, it goes dormant
+			HAZARD_ACID:
+				moved = _flow_liquid(pos, HAZARD_ACID)
+
+			HAZARD_GAS:
+				if randf() < gas_dissipate_chance:
+					hazard_layer.set_cell(pos, -1)
+					_wake_neighbors(pos)
+					continue
+				moved = _flow_gas(pos)
+
+			# ice doesn't flow - never gets added to active_hazards anyway
+
 		if moved:
-			still_active[pos] = true   # something happened, re-check next tick
+			still_active[pos] = true
 
 	active_hazards = still_active
 
 
-# -------- LAVA: tries to fall, then spread sideways --------
-func _flow_lava(pos: Vector2i) -> bool:
+# Generic liquid flow (for lava and acid - both behave the same way)
+func _flow_liquid(pos: Vector2i, liquid_tile: Vector2i) -> bool:
 
 	var below: Vector2i = Vector2i(pos.x, pos.y + 1)
 
 	if _is_empty(below):
-		_move_hazard(pos, below, Vector2i(8, 0))
+		_move_hazard(pos, below, liquid_tile)
 		return true
 
-	# can't fall - try to spread sideways (only if blocked below)
 	var left: Vector2i = Vector2i(pos.x - 1, pos.y)
 	var right: Vector2i = Vector2i(pos.x + 1, pos.y)
 
-	# prefer the side that has emptiness underneath (real flow)
 	var candidates: Array = []
 	if _is_empty(left) and _is_empty(Vector2i(left.x, left.y + 1)):
 		candidates.append(left)
 	if _is_empty(right) and _is_empty(Vector2i(right.x, right.y + 1)):
 		candidates.append(right)
 
-	# fallback: any empty side
 	if candidates.is_empty():
 		if _is_empty(left):
 			candidates.append(left)
@@ -443,17 +552,14 @@ func _flow_lava(pos: Vector2i) -> bool:
 		return false
 
 	var target: Vector2i = candidates[randi() % candidates.size()]
-	_move_hazard(pos, target, Vector2i(8, 0))
+	_move_hazard(pos, target, liquid_tile)
 	return true
 
 
-# -------- GAS: drifts up and sideways, fills volume --------
 func _flow_gas(pos: Vector2i) -> bool:
 
-	# gas spreads to all empty neighbors (volume-fill) rather than moves
-	# this models "gas wants to occupy any empty space it touches"
 	var neighbors: Array = [
-		Vector2i(pos.x, pos.y - 1),    # up (preferred)
+		Vector2i(pos.x, pos.y - 1),
 		Vector2i(pos.x - 1, pos.y),
 		Vector2i(pos.x + 1, pos.y),
 		Vector2i(pos.x, pos.y + 1),
@@ -463,17 +569,15 @@ func _flow_gas(pos: Vector2i) -> bool:
 
 	for n in neighbors:
 		if _is_empty(n):
-			hazard_layer.set_cell(n, TILE_SOURCE_ID, Vector2i(9, 0))
+			hazard_layer.set_cell(n, TILE_SOURCE_ID, HAZARD_GAS)
 			active_hazards[n] = true
 			spread = true
 
 	return spread
 
 
-# -------- HELPERS --------
 func _is_empty(pos: Vector2i) -> bool:
 
-	# empty means: no solid terrain AND no hazard
 	if get_cell_atlas_coords(pos) != Vector2i(-1, -1):
 		return false
 
@@ -490,13 +594,14 @@ func _move_hazard(from: Vector2i, to: Vector2i, tile: Vector2i) -> void:
 
 	active_hazards[to] = true
 
-	# the now-empty source cell might let other hazards flow into it
 	_wake_neighbors(from)
 
 
+# -------------------------
+# SAVE / LOAD
+# -------------------------
 func _apply_world_save(save: Dictionary) -> void:
 
-	# restore player-cleared terrain cells
 	if save.has("cleared_cells"):
 		for cell_str in save["cleared_cells"]:
 			var parts: PackedStringArray = cell_str.split(",")
@@ -506,7 +611,6 @@ func _apply_world_save(save: Dictionary) -> void:
 			set_cell(pos, -1)
 			cleared_cells[pos] = true
 
-	# restore hazards (overwrite generated ones with saved state)
 	if save.has("hazards") and hazard_layer:
 		hazard_layer.clear()
 		active_hazards.clear()
@@ -515,13 +619,16 @@ func _apply_world_save(save: Dictionary) -> void:
 			var pos := Vector2i(int(h["x"]), int(h["y"]))
 			var tile := Vector2i(int(h["tx"]), int(h["ty"]))
 			hazard_layer.set_cell(pos, TILE_SOURCE_ID, tile)
-			active_hazards[pos] = true
-		
-			
+
+			# only flowing hazards become active again on reload
+			if tile == HAZARD_LAVA or tile == HAZARD_GAS or tile == HAZARD_ACID:
+				active_hazards[pos] = true
+
+
 func mark_cleared(pos: Vector2i) -> void:
 	cleared_cells[pos] = true
-	
-	
+
+
 func build_world_save() -> Dictionary:
 
 	var cleared: Array = []
@@ -530,7 +637,6 @@ func build_world_save() -> Dictionary:
 
 	var hazards: Array = []
 	if hazard_layer:
-		# enumerate every used hazard cell
 		for cell in hazard_layer.get_used_cells():
 			var tile: Vector2i = hazard_layer.get_cell_atlas_coords(cell)
 			hazards.append({

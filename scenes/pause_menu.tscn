@@ -1,0 +1,81 @@
+[gd_scene format=3 uid="uid://dogf42auvxg8y"]
+
+[ext_resource type="Script" uid="uid://bplqq0521ku08" path="res://scripts/pause_menu.gd" id="1_n87rw"]
+
+[node name="PauseMenu" type="CanvasLayer" unique_id=100186306]
+process_mode = 3
+layer = 110
+script = ExtResource("1_n87rw")
+
+[node name="Backdrop" type="ColorRect" parent="." unique_id=306035306]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 1)
+
+[node name="Panel" type="PanelContainer" parent="." unique_id=2102993220]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -260.0
+offset_right = 200.0
+offset_bottom = 260.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBox" type="VBoxContainer" parent="Panel" unique_id=1909875081]
+layout_mode = 2
+size_flags_stretch_ratio = 0.0
+theme_override_constants/separation = 12
+
+[node name="Title" type="Label" parent="Panel/VBox" unique_id=1795890739]
+layout_mode = 2
+theme_override_font_sizes/font_size = 30
+text = "PAUSED"
+horizontal_alignment = 1
+
+[node name="ResumeButton" type="Button" parent="Panel/VBox" unique_id=1347553172]
+layout_mode = 2
+text = "Resume"
+
+[node name="NewWorldButton" type="Button" parent="Panel/VBox" unique_id=2120522979]
+layout_mode = 2
+text = "New World"
+
+[node name="FullResetButton" type="Button" parent="Panel/VBox" unique_id=1924578243]
+layout_mode = 2
+text = "Full Reset"
+
+[node name="QuitButton" type="Button" parent="Panel/VBox" unique_id=355520351]
+layout_mode = 2
+text = "Quit Game"
+
+[node name="ConfirmPanel" type="PanelContainer" parent="Panel/VBox" unique_id=918725466]
+visible = false
+layout_mode = 2
+
+[node name="ConfirmVBox" type="VBoxContainer" parent="Panel/VBox/ConfirmPanel" unique_id=501848189]
+layout_mode = 2
+
+[node name="ConfirmLabel" type="Label" parent="Panel/VBox/ConfirmPanel/ConfirmVBox" unique_id=1714663510]
+layout_mode = 2
+text = "Are You Sure?"
+
+[node name="ConfirmDetail" type="Label" parent="Panel/VBox/ConfirmPanel/ConfirmVBox" unique_id=1547284812]
+layout_mode = 2
+
+[node name="HBox" type="HBoxContainer" parent="Panel/VBox/ConfirmPanel/ConfirmVBox" unique_id=74452757]
+layout_mode = 2
+
+[node name="YesButton" type="Button" parent="Panel/VBox/ConfirmPanel/ConfirmVBox/HBox" unique_id=1994298565]
+layout_mode = 2
+text = "Yes, do it"
+
+[node name="NoButton" type="Button" parent="Panel/VBox/ConfirmPanel/ConfirmVBox/HBox" unique_id=2120089473]
+layout_mode = 2
+text = "Cancel"

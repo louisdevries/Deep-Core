@@ -36,6 +36,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if event.is_action_pressed("ui_cancel"):
+
+		# don't close if pause menu is shown on top
+		var pause_menu := get_tree().current_scene.get_node_or_null("PauseMenu") as CanvasLayer
+		if pause_menu and pause_menu.visible:
+			return
+
 		close()
 		get_viewport().set_input_as_handled()
 
@@ -183,9 +189,16 @@ func _on_buy(upgrade_id: String) -> void:
 		player.resources[r] -= next_data["resources"][r]
 
 	# apply upgrade
-	var new_value = current_value + increment
+	var new_value
+	if next_data.has("result_value"):
+		new_value = next_data["result_value"]
+	else:
+		new_value = current_value + increment
+
 	player.set(player_var, new_value)
 
 	print("Bought upgrade: ", upgrade_id, " new value: ", new_value)
+
+	
 
 	rebuild_ui()
