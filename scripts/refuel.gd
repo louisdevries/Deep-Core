@@ -98,11 +98,6 @@ func _on_body_entered(body):
 	if body.fuel < body.max_fuel:
 		body.fuel = body.max_fuel
 
-	# sell ore
-	var earned = body.ore * body.ore_sell_value
-	if earned > 0:
-		body.money += earned
-
 	body.ore = 0
 	body.cargo = 0
 

@@ -11,6 +11,8 @@
 [ext_resource type="Texture2D" uid="uid://jmqss55gwuwr" path="res://assets/drill.png" id="6_saaj3"]
 [ext_resource type="Texture2D" uid="uid://cp1gtafer34qi" path="res://assets/sonar.png" id="7_jnbrs"]
 [ext_resource type="Texture2D" uid="uid://cxyhv7jig2d6g" path="res://assets/cable.png" id="11_bdd5e"]
+[ext_resource type="Texture2D" uid="uid://ceiloedh01aq1" path="res://assets/ui_pause.png" id="12_bswi6"]
+[ext_resource type="Texture2D" uid="uid://cl2dt450f7ghq" path="res://assets/ui_inventory.png" id="13_ilxsp"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn"]
 bg_color = Color(0.05, 0.05, 0.14, 0.5)
@@ -177,3 +179,15 @@ scale = Vector2(0.05562498, 0.059523802)
 texture_normal = ExtResource("11_bdd5e")
 action = "cable_toggle"
 visibility_mode = 1
+
+[node name="InventoryButton" type="TouchScreenButton" parent="." unique_id=535010612]
+position = Vector2(1228, 11)
+scale = Vector2(2, 2)
+texture_normal = ExtResource("12_bswi6")
+action = "inventory"
+
+[node name="PauseButton" type="TouchScreenButton" parent="." unique_id=1533694308]
+position = Vector2(1228, 55)
+scale = Vector2(2, 2)
+texture_normal = ExtResource("13_ilxsp")
+action = "pause"

@@ -48,34 +48,36 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func rebuild_ui() -> void:
 
-	# clear all tab contents
+	# clear existing upgrade tabs
 	for i in range(tab_container.get_child_count()):
 		var tab := tab_container.get_child(i)
 		for c in tab.get_children():
 			c.queue_free()
 
-	# refresh player resource header
 	_update_player_stats()
 
-	# group upgrades by category, then create cards
+	# UPGRADE TABS (existing logic)
 	var by_category: Dictionary = {}
-
 	for upgrade_id in UpgradeData.UPGRADES.keys():
-
 		var upgrade: Dictionary = UpgradeData.UPGRADES[upgrade_id]
 		var cat: String = upgrade["category"]
-
 		if not by_category.has(cat):
 			by_category[cat] = []
-
 		by_category[cat].append(upgrade_id)
 
-	# populate each tab
 	for i in range(tab_container.get_child_count()):
-
 		var tab_node := tab_container.get_child(i)
 		var tab_name := tab_node.name
 
+		# special tabs
+		if tab_name == "Inventory":
+			_populate_inventory_tab(tab_node)
+			continue
+		if tab_name == "Storage":
+			_populate_storage_tab(tab_node)
+			continue
+
+		# upgrade tabs
 		if not by_category.has(tab_name):
 			continue
 
@@ -107,7 +109,12 @@ func _build_card(upgrade_id: String) -> Control:
 	var increment = UpgradeData.TIER_INCREMENTS.get(player_var, 1)
 
 	# current tier = how many increments above starting value (1-indexed)
-	var current_tier: int = int(round((current_value - starting_value) / float(increment))) + 1
+	var current_tier: int
+	if typeof(current_value) == TYPE_BOOL:
+		current_tier = 2 if current_value else 1
+	else:
+		current_tier = int(round((current_value - starting_value) / float(increment))) + 1
+		
 	var max_tier: int = tiers.size() + 1   # starting tier is tier 1, then +len tiers
 
 	# build the visual card
@@ -158,7 +165,9 @@ func _can_afford(tier_data: Dictionary) -> bool:
 		return false
 
 	for r in tier_data["resources"]:
-		if player.resources.get(r, 0) < tier_data["resources"][r]:
+		var needed: int = tier_data["resources"][r]
+		var have: int = player.get_total_amount(r)
+		if have < needed:
 			return false
 
 	return true
@@ -173,7 +182,11 @@ func _on_buy(upgrade_id: String) -> void:
 	var starting_value = UpgradeData.STARTING_VALUES.get(player_var, 1)
 	var increment = UpgradeData.TIER_INCREMENTS.get(player_var, 1)
 
-	var current_tier: int = int(round((current_value - starting_value) / float(increment))) + 1
+	var current_tier: int
+	if typeof(current_value) == TYPE_BOOL:
+		current_tier = 2 if current_value else 1
+	else:
+		current_tier = int(round((current_value - starting_value) / float(increment))) + 1
 
 	if current_tier > tiers.size():
 		return   # maxed
@@ -186,8 +199,8 @@ func _on_buy(upgrade_id: String) -> void:
 	# deduct cost
 	player.money -= next_data["money"]
 	for r in next_data["resources"]:
-		player.resources[r] -= next_data["resources"][r]
-
+		player.consume_material(r, next_data["resources"][r])
+		
 	# apply upgrade
 	var new_value
 	if next_data.has("result_value"):
@@ -201,4 +214,125 @@ func _on_buy(upgrade_id: String) -> void:
 
 	
 
+	rebuild_ui()
+	
+	
+func _populate_inventory_tab(tab: Node) -> void:
+
+	for material_id in ResourceData.DISPLAY_ORDER:
+
+		var count: int = 0
+		if material_id == "basic_ore":
+			count = player.ore
+		else:
+			count = player.resources.get(material_id, 0)
+
+		if count == 0:
+			continue
+
+		var row := _build_inventory_row(material_id, count)
+		tab.add_child(row)
+
+
+func _populate_storage_tab(tab: Node) -> void:
+
+	# header showing storage usage
+	var header := Label.new()
+	header.text = "Storage: %d / %d" % [player.get_storage_used(), player.max_storage]
+	tab.add_child(header)
+
+	# items in storage
+	for material_id in ResourceData.DISPLAY_ORDER:
+		var count: int = player.storage.get(material_id, 0)
+		if count == 0:
+			continue
+
+		var row := _build_storage_row(material_id, count)
+		tab.add_child(row)
+
+
+func _build_inventory_row(material_id: String, count: int) -> Control:
+
+	var data: Dictionary = ResourceData.RESOURCES.get(material_id, {})
+	var row := PanelContainer.new()
+	var hbox := HBoxContainer.new()
+	hbox.add_theme_constant_override("separation", 6)
+	row.add_child(hbox)
+
+	# color swatch
+	var swatch := ColorRect.new()
+	swatch.color = data.get("color", Color.WHITE)
+	swatch.custom_minimum_size = Vector2(24, 24)
+	hbox.add_child(swatch)
+
+	# name + count
+	var name_label := Label.new()
+	name_label.text = "%s × %d" % [data.get("display_name", material_id), count]
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hbox.add_child(name_label)
+
+	# unit value
+	var unit_value: int = data.get("value", 0)
+
+	# Sell All button
+	var sell_btn := Button.new()
+	sell_btn.text = "Sell ($%d)" % (unit_value * count)
+	sell_btn.pressed.connect(_on_sell_material.bind(material_id, count))
+	hbox.add_child(sell_btn)
+
+	# Store All button
+	var store_btn := Button.new()
+	store_btn.text = "Store"
+	# disable if storage is full
+	if not player.can_store(1):
+		store_btn.disabled = true
+		store_btn.text = "Full"
+	store_btn.pressed.connect(_on_store_material.bind(material_id, count))
+	hbox.add_child(store_btn)
+
+	return row
+
+
+func _build_storage_row(material_id: String, count: int) -> Control:
+
+	var data: Dictionary = ResourceData.RESOURCES.get(material_id, {})
+	var row := PanelContainer.new()
+	var hbox := HBoxContainer.new()
+	hbox.add_theme_constant_override("separation", 6)
+	row.add_child(hbox)
+
+	var swatch := ColorRect.new()
+	swatch.color = data.get("color", Color.WHITE)
+	swatch.custom_minimum_size = Vector2(24, 24)
+	hbox.add_child(swatch)
+
+	var name_label := Label.new()
+	name_label.text = "%s × %d" % [data.get("display_name", material_id), count]
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hbox.add_child(name_label)
+
+	# Retrieve button (sends to cargo)
+	var retrieve_btn := Button.new()
+	retrieve_btn.text = "Retrieve"
+	retrieve_btn.pressed.connect(_on_retrieve_material.bind(material_id, count))
+	hbox.add_child(retrieve_btn)
+
+	return row
+
+
+func _on_sell_material(material_id: String, amount: int) -> void:
+	var earned: int = player.sell_material(material_id, amount)
+	print("Sold ", amount, " ", material_id, " for $", earned)
+	rebuild_ui()
+
+
+func _on_store_material(material_id: String, amount: int) -> void:
+	var moved: int = player.transfer_to_storage(material_id, amount)
+	print("Stored ", moved, " ", material_id)
+	rebuild_ui()
+
+
+func _on_retrieve_material(material_id: String, amount: int) -> void:
+	var moved: int = player.transfer_to_cargo(material_id, amount)
+	print("Retrieved ", moved, " ", material_id)
 	rebuild_ui()

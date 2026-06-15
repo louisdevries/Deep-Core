@@ -1,0 +1,50 @@
+[gd_scene format=3 uid="uid://b08sixsnx6su5"]
+
+[ext_resource type="Script" uid="uid://gmyt276t4gmu" path="res://scripts/inventory_view.gd" id="1_i474e"]
+
+[node name="InventoryView" type="CanvasLayer" unique_id=1228721132]
+script = ExtResource("1_i474e")
+
+[node name="Backdrop" type="ColorRect" parent="." unique_id=624004242]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.84313726)
+
+[node name="Panel" type="PanelContainer" parent="." unique_id=1820905553]
+custom_minimum_size = Vector2(500, 700)
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.0
+offset_top = -20.0
+offset_right = 20.0
+offset_bottom = 20.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBox" type="VBoxContainer" parent="Panel" unique_id=921228013]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="TitleLabel" type="Label" parent="Panel/VBox" unique_id=348255779]
+layout_mode = 2
+text = "CARGO"
+horizontal_alignment = 1
+
+[node name="CapacityLabel" type="Label" parent="Panel/VBox" unique_id=605821362]
+layout_mode = 2
+text = "0 / 20"
+
+[node name="ScrollContainer" type="ScrollContainer" parent="Panel/VBox" unique_id=1654155394]
+layout_mode = 2
+
+[node name="ItemsList" type="VBoxContainer" parent="Panel/VBox/ScrollContainer" unique_id=326238991]
+layout_mode = 2
+
+[node name="CloseButton" type="Button" parent="Panel/VBox" unique_id=664981853]
+layout_mode = 2

@@ -91,6 +91,60 @@ const UPGRADES := {
 			{ "money": 1500, "resources": { "copper": 15, "iron": 5 } },
 		]
 	},
+	"furnace_slots": {
+		"name": "Furnace Slots",
+		"category": CATEGORY_EQUIPMENT,
+		"description": "Refine multiple recipes simultaneously.",
+		"player_var": "furnace_slot_count",
+		"tiers": [
+			{ "money": 500,   "resources": { "copper": 10 } },
+			{ "money": 2000,  "resources": { "iron": 15 } },
+			{ "money": 8000,  "resources": { "titanium": 8 } },
+			{ "money": 25000, "resources": { "mythril": 3 } },
+		]
+	},
+	"multi_drill": {
+		"name": "Drill Array",
+		"category": CATEGORY_DRILLING,
+		"description": "Mount additional drill arms for parallel mining.",
+		"player_var": "drill_count",
+		"tiers": [
+			{ "money": 3000, "resources": { "iron": 30, "copper": 25, "gold": 5 } },   # → 2 drills
+			{ "money": 12000, "resources": { "platinum": 8, "titanium": 20, "gold": 15 } },  # → 3 drills
+		]
+	},
+	
+	"left_drill": {
+		"name": "Left Drill Mount",
+		"category": CATEGORY_DRILLING,
+		"description": "Mounts a permanent drill on the left side.",
+		"player_var": "has_left_drill",
+		"tiers": [
+			{ "money": 2500, "resources": { "iron": 20, "copper": 15 }, "result_value": true },
+		]
+	},
+
+	"right_drill": {
+		"name": "Right Drill Mount",
+		"category": CATEGORY_DRILLING,
+		"description": "Mounts a permanent drill on the right side.",
+		"player_var": "has_right_drill",
+		"tiers": [
+			{ "money": 2500, "resources": { "iron": 20, "copper": 15 }, "result_value": true },
+		]
+	},
+	"storage_capacity": {
+		"name": "Storage Capacity",
+		"category": CATEGORY_EQUIPMENT,
+		"description": "Expand the safe storage at the refuel station.",
+		"player_var": "max_storage",
+		"tiers": [
+			{ "money": 500,   "resources": { "iron": 10 } },
+			{ "money": 2000,  "resources": { "iron": 25, "copper": 15 } },
+			{ "money": 8000,  "resources": { "titanium": 10 } },
+			{ "money": 25000, "resources": { "mythril": 5, "adamantium": 3 } },
+		]
+	},
 }
 
 
@@ -101,7 +155,12 @@ const STARTING_VALUES := {
 	"sonar_range": 8,
 	"max_cargo": 20,
 	"max_fuel": 100.0,
-	"max_cable_length": 1200.0
+	"max_cable_length": 1200.0,
+	"has_thrusters": false,
+	"drill_count": 1,
+	"has_left_drill": false,
+	"has_right_drill": false,
+	"max_storage": 100,
 }
 
 
@@ -113,5 +172,10 @@ const TIER_INCREMENTS := {
 	"sonar_range": 3,    # +3 tiles per tier
 	"max_cargo": 15,     # +15 per tier
 	"max_fuel": 50.0,     # +50 per tier
-	"max_cable_length": 400.0    # +25 tiles per upgrade
+	"max_cable_length": 400.0,   # +25 tiles per upgrade
+	"has_thrusters": true,
+	"drill_count": 1,    # +1 per tier
+	"has_left_drill": true,
+	"has_right_drill": true,
+	"max_storage": 100,    # +100 storage per tier
 }

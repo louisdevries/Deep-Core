@@ -57,6 +57,10 @@ var upgrade_cost = 50
 var can_upgrade = false
 var current_depth = 0
 
+# STORAGE
+var storage: Dictionary = {}
+var max_storage: int = 100   # starting capacity
+
 # HEALTH
 @export var max_health: float = 100.0
 var health: float = 100.0
@@ -66,6 +70,9 @@ var regen_delay: float = 4.0
 var is_dead: bool = false
 var damage_flash_timer: float = 0.0
 
+# Multi-drill: 1 = single, 2 = dual, 3 = triple
+var drill_count: int = 1
+var permanent_drills: Array[Vector2i] = []   # which sides are permanently mounted
 # THRUSTERS (upgrade-gated)
 var has_thrusters: bool = false
 
@@ -74,6 +81,8 @@ var spawn_position: Vector2
 
 # UI
 var ui_health_bar
+
+var furnace_slot_count: int = 1
 
 # RESOURCE STORAGE - all material types
 var resources = {
@@ -224,9 +233,6 @@ var ui_fuel_bar
 var ui_gear_label
 var ui_money_label
 var ui_cargo_label
-var ui_copper_label
-var ui_iron_label
-var ui_crystal_label
 var ui_sonar_label
 var ui_drill_dir_label
 
@@ -243,6 +249,8 @@ var drill_impact_sound
 # DRILL SWIVEL
 var drill_swivel_tier: int = 1
 var drill_direction: Vector2i = Vector2i.DOWN
+var has_left_drill: bool = false
+var has_right_drill: bool = false
 
 var cargo = 0
 var max_cargo = 20
@@ -264,6 +272,9 @@ var sonar_sweep_duration: float = 0.8
 var sonar_last_radius: float = 0.0
 var sonar_center_tile: Vector2i
 
+var ui_cable_bar
+var ui_cable_label
+
 @onready var player_light = $PointLight2D
 
 
@@ -280,14 +291,19 @@ func _ready():
 	ui_gear_label = get_tree().get_first_node_in_group("ui_gear")
 	ui_money_label = get_tree().get_first_node_in_group("ui_money")
 	ui_cargo_label = get_tree().get_first_node_in_group("ui_cargo")
-	ui_copper_label = get_tree().get_first_node_in_group("ui_copper")
-	ui_iron_label = get_tree().get_first_node_in_group("ui_iron")
-	ui_crystal_label = get_tree().get_first_node_in_group("ui_crystal")
+	
 	ui_sonar_label = get_tree().get_first_node_in_group("ui_sonar")
 	ui_health_bar = get_tree().get_first_node_in_group("ui_health")
 	hazard_layer = get_tree().get_first_node_in_group("hazards")
 	ui_drill_dir_label = get_tree().get_first_node_in_group("ui_drill_dir")
+	ui_cable_bar = get_tree().get_first_node_in_group("ui_cable_bar")
+	ui_cable_label = get_tree().get_first_node_in_group("ui_cable_label")
+
+	if ui_cable_bar:
+		ui_cable_bar.max_value = max_cable_length
+		
 	spawn_position = global_position
+	_cable_anchor = _find_refuel_anchor()
 	health = max_health
 
 	sonar_markers_container = Node2D.new()
@@ -344,16 +360,7 @@ func _physics_process(delta):
 
 	if ui_cargo_label:
 		ui_cargo_label.text = "Cargo: " + str(cargo) + " / " + str(max_cargo)
-
-	if ui_copper_label:
-		ui_copper_label.text = "Copper: " + str(resources["copper"])
-
-	if ui_iron_label:
-		ui_iron_label.text = "Iron: " + str(resources["iron"])
-
-	if ui_crystal_label:
-		ui_crystal_label.text = "Crystal: " + str(resources["crystal"])
-
+		
 	if ui_sonar_label:
 		if sonar_cooldown_timer > 0.0:
 			ui_sonar_label.text = "Sonar: %.1fs" % sonar_cooldown_timer
@@ -368,7 +375,15 @@ func _physics_process(delta):
 			Vector2i.LEFT:  ui_drill_dir_label.text = "Drill: ←"
 			Vector2i.DOWN:  ui_drill_dir_label.text = "Drill: ↓"
 			Vector2i.RIGHT: ui_drill_dir_label.text = "Drill: →"
+			
+	if ui_cable_bar:
+		ui_cable_bar.max_value = max_cable_length    # in case it got upgraded
+		ui_cable_bar.value = _cable_paid_out
 
+	if ui_cable_label:
+		ui_cable_label.text = "Cable: %d / %d" % [int(_cable_paid_out), int(max_cable_length)]
+	
+	_update_machine_sprite()
 	current_depth = int(global_position.y / 16)
 	update_player_light()
 	update_darkness()
@@ -378,6 +393,7 @@ func _physics_process(delta):
 
 	terrain.update_fog(global_position)
 	update_camera_shake()
+	_update_cable_wrap_points()
 	_update_cable_visual()
 
 
@@ -447,17 +463,24 @@ func handle_movement(delta: float) -> void:
 	move_and_slide()
 	_clamp_to_camera_bounds()
 
-	# --- cable constraint: clamp player to within paid-out length of anchor ---
-	var to_player: Vector2 = global_position - _cable_anchor
-	var dist: float = to_player.length()
+	# total length of cable path through any wrap points
+	var path_length: float = _get_rope_path_length()
 
-	if dist > _cable_paid_out:
-		# pull player back onto the cable circle
-		var clamped: Vector2 = _cable_anchor + to_player.normalized() * _cable_paid_out
+	if path_length > _cable_paid_out:
+		# the "free" portion of cable goes from the effective anchor (last wrap point)
+		# to the player. We need to clamp the free portion's length.
+		var effective_anchor: Vector2 = _get_effective_anchor()
+		var to_player: Vector2 = global_position - effective_anchor
+
+		# length used by the wrapped portion (anchor → wrap points)
+		var wrapped_length: float = path_length - to_player.length()
+
+		# how much cable is left for the final segment
+		var free_length: float = max(0.0, _cable_paid_out - wrapped_length)
+
+		var clamped: Vector2 = effective_anchor + to_player.normalized() * free_length
 		global_position = clamped
 
-		# kill velocity component pointing away from the anchor
-		# (this is what cancels gravity once the cable is taut)
 		var away_dir: Vector2 = to_player.normalized()
 		var away_velocity: float = velocity.dot(away_dir)
 		if away_velocity > 0:
@@ -472,7 +495,7 @@ func world_to_tile(pos: Vector2) -> Vector2i:
 	return terrain.local_to_map(local_pos)
 
 
-func drill(delta):
+func drill(delta: float) -> void:
 
 	drill_timer += delta
 
@@ -483,29 +506,34 @@ func drill(delta):
 
 	fuel -= fuel_drain_drill * drill_gear * delta
 
-	var perpendicular_offset: int = 6
-	var depth_offset: int = 10
+	var perpendicular_offset: int = 8
+	var depth_offset: int = 20
 
-	var target_a: Vector2
-	var target_b: Vector2
+	# Build list of drill directions based on multi-drill upgrade and current swivel
+	var drill_dirs: Array = _get_active_drill_directions()
 
-	match drill_direction:
+	# For each active direction, drill 2 perpendicular tiles
+	for dir: Vector2i in drill_dirs:
 
-		Vector2i.DOWN:
-			target_a = global_position + Vector2(-perpendicular_offset, depth_offset)
-			target_b = global_position + Vector2(perpendicular_offset, depth_offset)
+		var target_a: Vector2
+		var target_b: Vector2
 
-		Vector2i.LEFT:
-			target_a = global_position + Vector2(-depth_offset, -perpendicular_offset)
-			target_b = global_position + Vector2(-depth_offset, perpendicular_offset)
+		match dir:
 
-		Vector2i.RIGHT:
-			target_a = global_position + Vector2(depth_offset, -perpendicular_offset)
-			target_b = global_position + Vector2(depth_offset, perpendicular_offset)
+			Vector2i.DOWN:
+				target_a = global_position + Vector2(-perpendicular_offset, depth_offset)
+				target_b = global_position + Vector2(perpendicular_offset, depth_offset)
 
-	try_break_tile(world_to_tile(target_a))
-	try_break_tile(world_to_tile(target_b))
+			Vector2i.LEFT:
+				target_a = global_position + Vector2(-depth_offset, -perpendicular_offset)
+				target_b = global_position + Vector2(-depth_offset, perpendicular_offset)
 
+			Vector2i.RIGHT:
+				target_a = global_position + Vector2(depth_offset, -perpendicular_offset)
+				target_b = global_position + Vector2(depth_offset, perpendicular_offset)
+
+		try_break_tile(world_to_tile(target_a))
+		try_break_tile(world_to_tile(target_b))
 
 func try_break_tile(tile_pos: Vector2i):
 
@@ -776,14 +804,15 @@ func die() -> void:
 
 	print("=== PLAYER DIED ===")
 
-	# wipe cargo and all carried resources (money stays - banked)
+	# Wipe cargo (the risky stuff)
 	cargo = 0
 	ore = 0
 	for key in resources.keys():
 		resources[key] = 0
 
-	get_tree().create_timer(1.5).timeout.connect(respawn)
+	# Storage SURVIVES death — it's the safe space
 
+	get_tree().create_timer(1.5).timeout.connect(respawn)
 
 func respawn() -> void:
 
@@ -806,10 +835,10 @@ func check_hazard_contact(delta: float) -> void:
 
 	var check_offsets: Array = [
 		Vector2(0, 0),
-		Vector2(-6, -6),
-		Vector2(6, -6),
-		Vector2(-6, 6),
-		Vector2(6, 6),
+		Vector2(-12, -12),
+		Vector2(12, -12),
+		Vector2(-12, 12),
+		Vector2(12, 12),
 	]
 
 	var health_dmg: float = 0.0
@@ -859,9 +888,9 @@ func update_health(delta: float) -> void:
 
 	if damage_flash_timer > 0.0:
 		damage_flash_timer -= delta
-		$Sprite2D.modulate = Color(1.5, 0.4, 0.4, 1.0)
+		$MachineSprite.modulate = Color(1.5, 0.4, 0.4, 1.0)
 	else:
-		$Sprite2D.modulate = Color.WHITE
+		$MachineSprite.modulate = Color.WHITE
 
 
 func build_player_save() -> Dictionary:
@@ -883,6 +912,12 @@ func build_player_save() -> Dictionary:
 		"max_fuel": max_fuel,
 		"max_cable_length": max_cable_length,
 		"has_thrusters": has_thrusters,
+		"furnace_slot_count": furnace_slot_count,
+		"drill_count": drill_count,
+		"has_left_drill": has_left_drill,
+		"has_right_drill": has_right_drill,
+		"storage": storage,
+		"max_storage": max_storage,
 	}
 
 
@@ -903,6 +938,18 @@ func apply_player_save(save: Dictionary) -> void:
 	max_cable_length = save.get("max_cable_length", 800.0)
 	max_fuel = save.get("max_fuel", 100.0)
 	has_thrusters = save.get("has_thrusters", false)
+	drill_count = save.get("drill_count", 1)
+	has_left_drill = save.get("has_left_drill", false)
+	has_right_drill = save.get("has_right_drill", false)
+	max_storage = save.get("max_storage", 100)
+
+	if save.has("storage"):
+		storage = save["storage"].duplicate()
+		# ensure all keys are ints (JSON might load them as floats)
+		for key in storage.keys():
+			storage[key] = int(storage[key])
+	furnace_slot_count = save.get("furnace_slot_count", 1)
+	FurnaceSystem.slot_count = furnace_slot_count
 	if save.has("drill_direction"):
 		var d: Array = save["drill_direction"]
 		drill_direction = Vector2i(int(d[0]), int(d[1]))
@@ -925,13 +972,17 @@ func _handle_swivel_input() -> void:
 
 	# tier 3: no restrictions
 
+	# Can't swivel toward a permanently-mounted drill (it's already there)
 	if Input.is_action_just_pressed("drill_left"):
-		drill_direction = Vector2i.LEFT
+		if not (Vector2i.LEFT in permanent_drills):
+			drill_direction = Vector2i.LEFT
+
 	elif Input.is_action_just_pressed("drill_down"):
 		drill_direction = Vector2i.DOWN
-	elif Input.is_action_just_pressed("drill_right"):
-		drill_direction = Vector2i.RIGHT
 
+	elif Input.is_action_just_pressed("drill_right"):
+		if not (Vector2i.RIGHT in permanent_drills):
+			drill_direction = Vector2i.RIGHT
 
 
 
@@ -978,7 +1029,7 @@ func _handle_free_movement(delta):
 
 
 func _clamp_to_camera_bounds() -> void:
-	const HALF_W: float = 6.0
+	const HALF_W: float = 12.0
 	global_position.x = clamp(global_position.x, camera.limit_left + HALF_W, camera.limit_right - HALF_W)
 
 
@@ -988,28 +1039,51 @@ func _get_effective_anchor() -> Vector2:
 
 func _find_wrap_corner(hit_pos: Vector2, hit_normal: Vector2, from_anchor: Vector2) -> Vector2:
 	var space_state := get_world_2d().direct_space_state
-	var tile_pos: Vector2i = terrain.local_to_map(terrain.to_local(hit_pos - hit_normal * 1.0))
+	
+	# Find the solid tile we hit
+	var solid_tile_pos: Vector2i = terrain.local_to_map(terrain.to_local(hit_pos - hit_normal * 1.0))
 	var half := Vector2(terrain.tile_set.tile_size) * 0.5
-	var tile_center: Vector2 = terrain.to_global(terrain.map_to_local(tile_pos))
-
-	var corners := [
-		tile_center + Vector2(-half.x, -half.y),
-		tile_center + Vector2( half.x, -half.y),
-		tile_center + Vector2(-half.x,  half.y),
-		tile_center + Vector2( half.x,  half.y),
+	var solid_center: Vector2 = terrain.to_global(terrain.map_to_local(solid_tile_pos))
+	
+	# 4 corners of the solid tile
+	var raw_corners := [
+		solid_center + Vector2(-half.x, -half.y),
+		solid_center + Vector2( half.x, -half.y),
+		solid_center + Vector2(-half.x,  half.y),
+		solid_center + Vector2( half.x,  half.y),
 	]
-
-	var best_corner := hit_pos
-	var best_dist := INF
+	
+	# Push each corner OUTWARD from the solid tile by a few pixels
+	# so the wrap point sits in empty space
+	var corners := []
+	for c: Vector2 in raw_corners:
+		var outward: Vector2 = (c - solid_center).normalized()
+		corners.append(c + outward * 3.0)    # 3 pixels outward
+	
+	# Among corners that have line-of-sight to BOTH the anchor and the player,
+	# pick the one closest to the anchor-player line.
+	var best_corner: Vector2 = hit_pos
+	var best_dist: float = INF
+	
 	for c: Vector2 in corners:
-		var q := PhysicsRayQueryParameters2D.create(from_anchor, c)
-		q.exclude = [self]
-		if not space_state.intersect_ray(q).is_empty():
+		# must have LOS to anchor
+		var q1 := PhysicsRayQueryParameters2D.create(from_anchor, c)
+		q1.exclude = [self]
+		if not space_state.intersect_ray(q1).is_empty():
 			continue
-		var d := c.distance_to(hit_pos)
+		
+		# must also have LOS to player (otherwise it's not a useful wrap)
+		var q2 := PhysicsRayQueryParameters2D.create(c, global_position)
+		q2.exclude = [self]
+		if not space_state.intersect_ray(q2).is_empty():
+			continue
+		
+		# pick the corner closest to the anchor-player line
+		var d := _distance_point_to_segment(c, from_anchor, global_position)
 		if d < best_dist:
 			best_dist = d
 			best_corner = c
+	
 	return best_corner
 
 
@@ -1018,7 +1092,12 @@ func _update_cable_wrap_points() -> void:
 
 	while _cable_wrap_points.size() > 0:
 		var prev: Vector2 = _cable_wrap_points[-2] if _cable_wrap_points.size() > 1 else _cable_anchor
-		var unwrap_q := PhysicsRayQueryParameters2D.create(prev, global_position)
+		
+		# check with a small margin — only unwrap if there's clear LOS with some space
+		var to_player_dir: Vector2 = (global_position - prev).normalized()
+		var check_target: Vector2 = global_position - to_player_dir * 4.0    # 4px back from player
+		
+		var unwrap_q := PhysicsRayQueryParameters2D.create(prev, check_target)
 		unwrap_q.exclude = [self]
 		if space_state.intersect_ray(unwrap_q).is_empty():
 			_cable_wrap_points.pop_back()
@@ -1095,8 +1174,8 @@ func _update_cable_visual() -> void:
 
 	var cable_line: Line2D = get_node_or_null("CableLine")
 	if not cable_line:
-		return
-
+		return	
+	
 	cable_line.visible = true
 	cable_line.clear_points()
 	cable_line.add_point(to_local(_cable_anchor))
@@ -1104,4 +1183,246 @@ func _update_cable_visual() -> void:
 		cable_line.add_point(to_local(wp))
 	cable_line.add_point(Vector2.ZERO)
 
+func _distance_point_to_segment(point: Vector2, seg_start: Vector2, seg_end: Vector2) -> float:
+	var seg := seg_end - seg_start
+	var len_sq := seg.length_squared()
+	if len_sq == 0.0:
+		return point.distance_to(seg_start)
 	
+	# project point onto segment, clamped to [0, 1]
+	var t: float = clamp((point - seg_start).dot(seg) / len_sq, 0.0, 1.0)
+	var projection: Vector2 = seg_start + seg * t
+	return point.distance_to(projection)
+
+func _get_drill_animation_name() -> String:
+
+	# Stage 4: both sides mounted
+	if has_left_drill and has_right_drill:
+		return "full"
+
+	# Stage 3a: left drill mounted
+	if has_left_drill:
+		match drill_direction:
+			Vector2i.RIGHT: return "left_right"
+			_:              return "bottom_left"
+
+	# Stage 3b: right drill mounted
+	if has_right_drill:
+		match drill_direction:
+			Vector2i.LEFT:  return "left_right"
+			_:              return "bottom_right"
+
+	# Stage 1 or 2: starter drill only
+	match drill_direction:
+		Vector2i.LEFT:  return "left"
+		Vector2i.RIGHT: return "right"
+		_:              return "down"
+
+
+func _get_active_drill_directions() -> Array:
+
+	var dirs: Array = [drill_direction]   # swivel-controlled drill
+
+	if has_left_drill and not (Vector2i.LEFT in dirs):
+		dirs.append(Vector2i.LEFT)
+
+	if has_right_drill and not (Vector2i.RIGHT in dirs):
+		dirs.append(Vector2i.RIGHT)
+
+	return dirs
+	
+func _update_machine_sprite() -> void:
+
+	var machine_sprite: AnimatedSprite2D = $MachineSprite
+	if not machine_sprite:
+		return
+
+	var target_anim: String = _get_drill_animation_name()
+
+	# only change animation if needed (avoid restarting every frame)
+	if machine_sprite.animation != target_anim:
+		machine_sprite.animation = target_anim
+		machine_sprite.frame = 0
+
+	# play animation while drilling, freeze on frame 0 when idle
+	if is_drilling and not machine_sprite.is_playing():
+		machine_sprite.play()
+	elif not is_drilling and machine_sprite.is_playing():
+		machine_sprite.stop()
+		machine_sprite.frame = 0
+
+
+func _on_inventory_button_pressed() -> void:
+	var inv := get_node_or_null("InventoryMenu") as CanvasLayer
+	if inv and inv.has_method("open"):
+		if inv.visible:
+			inv.close()
+		else:
+			inv.open()
+
+# Total amount of a material across cargo + storage (for upgrade checks)
+func get_total_amount(material: String) -> int:
+	var cargo_amt: int = resources.get(material, 0)
+	var storage_amt: int = storage.get(material, 0)
+	return cargo_amt + storage_amt
+
+
+# Consume material for an upgrade — deducts from cargo first, then storage
+func consume_material(material: String, amount: int) -> bool:
+
+	if get_total_amount(material) < amount:
+		return false
+
+	var cargo_amt: int = resources.get(material, 0)
+	var from_cargo: int = min(cargo_amt, amount)
+
+	resources[material] = cargo_amt - from_cargo
+	amount -= from_cargo
+
+	if amount > 0:
+		var storage_amt: int = storage.get(material, 0)
+		storage[material] = storage_amt - amount
+
+	# update cargo capacity used
+	_recompute_cargo()
+
+	return true
+
+
+# Recompute cargo used based on current resources
+func _recompute_cargo() -> void:
+
+	var total: int = ore   # basic ore = 1 cargo each
+
+	for tile in TerrainData.TERRAIN_TYPES:
+		var info: Dictionary = TerrainData.TERRAIN_TYPES[tile]
+		var rt = info.get("resource")
+		if rt == null:
+			continue
+		var cargo_value: int = info.get("cargo", 1)
+		var count: int = resources.get(rt, 0)
+		total += count * cargo_value
+
+	cargo = total
+
+
+# Total amount in storage (for capacity checks)
+func get_storage_used() -> int:
+	var total: int = 0
+	for v in storage.values():
+		total += v
+	return total
+
+
+# Check if there's room to store amount more of material
+func can_store(amount: int) -> bool:
+	return get_storage_used() + amount <= max_storage
+
+
+# Move material from cargo to storage; returns how much was actually moved
+func transfer_to_storage(material: String, amount: int) -> int:
+
+	var available: int = resources.get(material, 0)
+	if material == "basic_ore":
+		available = ore
+
+	var to_move: int = min(amount, available)
+
+	# capacity limit
+	var room: int = max_storage - get_storage_used()
+	to_move = min(to_move, room)
+
+	if to_move <= 0:
+		return 0
+
+	# remove from cargo
+	if material == "basic_ore":
+		ore -= to_move
+	else:
+		resources[material] = available - to_move
+
+	# add to storage
+	if not storage.has(material):
+		storage[material] = 0
+	storage[material] += to_move
+
+	_recompute_cargo()
+
+	return to_move
+
+
+# Move material from storage to cargo; returns how much was actually moved
+func transfer_to_cargo(material: String, amount: int) -> int:
+
+	var in_storage: int = storage.get(material, 0)
+	var to_move: int = min(amount, in_storage)
+
+	# cargo capacity check
+	var cargo_value: int = _get_cargo_value_for_material(material)
+	var room_in_cargo: int = max_cargo - cargo
+	var max_by_cargo: int = int(floor(float(room_in_cargo) / float(max(cargo_value, 1))))
+
+	to_move = min(to_move, max_by_cargo)
+
+	if to_move <= 0:
+		return 0
+
+	# remove from storage
+	storage[material] = in_storage - to_move
+
+	# add to cargo
+	if material == "basic_ore":
+		ore += to_move
+	else:
+		if not resources.has(material):
+			resources[material] = 0
+		resources[material] += to_move
+
+	_recompute_cargo()
+
+	return to_move
+
+
+# Look up cargo cost per unit for a given material
+func _get_cargo_value_for_material(material: String) -> int:
+
+	if material == "basic_ore":
+		return 1
+
+	for tile in TerrainData.TERRAIN_TYPES:
+		var info: Dictionary = TerrainData.TERRAIN_TYPES[tile]
+		if info.get("resource") == material:
+			return info.get("cargo", 1)
+
+	return 1
+
+
+# Sell material from cargo only (or both? — design choice)
+# For now: sell from cargo only. Storage is the "I want to keep this" space.
+func sell_material(material: String, amount: int) -> int:
+
+	const ResourceDataLocal = preload("res://scripts/data/resource_data.gd")
+	var data: Dictionary = ResourceDataLocal.RESOURCES.get(material, {})
+	var unit_value: int = data.get("value", 0)
+
+	var available: int
+	if material == "basic_ore":
+		available = ore
+	else:
+		available = resources.get(material, 0)
+
+	var to_sell: int = min(amount, available)
+	if to_sell <= 0:
+		return 0
+
+	if material == "basic_ore":
+		ore -= to_sell
+	else:
+		resources[material] = available - to_sell
+
+	var total: int = to_sell * unit_value
+	money += total
+
+	_recompute_cargo()
+
+	return total
