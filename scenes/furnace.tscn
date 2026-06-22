@@ -1,0 +1,38 @@
+[gd_scene format=3 uid="uid://bm3xkqan2wy7c"]
+
+[ext_resource type="Script" uid="uid://cnvykcuuma176" path="res://scripts/furnace.gd" id="1_furn"]
+[ext_resource type="Texture2D" uid="uid://wx8tdse7h2r0" path="res://assets/Equipment/furnace_level1_off.png" id="2_furn"]
+[ext_resource type="Texture2D" uid="uid://boh18papavn5m" path="res://assets/Equipment/furnace_level1_frame1.png" id="3_furn"]
+[ext_resource type="Texture2D" uid="uid://bli022ej03uxu" path="res://assets/Equipment/furnace_level1_frame2.png" id="4_furn"]
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_furn"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("3_furn")
+}, {
+"duration": 1.0,
+"texture": ExtResource("4_furn")
+}],
+"loop": true,
+"name": &"default",
+"speed": 5.0
+}]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_furn"]
+size = Vector2(32, 32)
+
+[node name="Furnace" type="Node2D"]
+script = ExtResource("1_furn")
+
+[node name="SpriteOff" type="Sprite2D" parent="."]
+texture = ExtResource("2_furn")
+
+[node name="SpriteOn" type="AnimatedSprite2D" parent="."]
+visible = false
+sprite_frames = SubResource("SpriteFrames_furn")
+
+[node name="Area2D" type="Area2D" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D"]
+shape = SubResource("RectangleShape2D_furn")

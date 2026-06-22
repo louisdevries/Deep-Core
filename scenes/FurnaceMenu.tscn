@@ -1,0 +1,72 @@
+[gd_scene format=3 uid="uid://b0droahdtg0aa"]
+
+[ext_resource type="Script" path="res://scripts/furnace_menu.gd" id="1_fm"]
+
+[node name="FurnaceMenu" type="CanvasLayer"]
+process_mode = 3
+script = ExtResource("1_fm")
+
+[node name="Panel" type="PanelContainer" parent="."]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -280.0
+offset_top = -240.0
+offset_right = 280.0
+offset_bottom = 240.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBox" type="VBoxContainer" parent="Panel"]
+layout_mode = 2
+
+[node name="HeaderHBox" type="HBoxContainer" parent="Panel/VBox"]
+layout_mode = 2
+
+[node name="TitleLabel" type="Label" parent="Panel/VBox/HeaderHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "FURNACE"
+
+[node name="UpgradeButton" type="Button" parent="Panel/VBox/HeaderHBox"]
+layout_mode = 2
+text = "Upgrade"
+
+[node name="Content" type="HBoxContainer" parent="Panel/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 12
+
+[node name="RecipeCol" type="VBoxContainer" parent="Panel/VBox/Content"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="RecipeLabel" type="Label" parent="Panel/VBox/Content/RecipeCol"]
+layout_mode = 2
+text = "Ore / Recipes"
+
+[node name="Scroll" type="ScrollContainer" parent="Panel/VBox/Content/RecipeCol"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="RecipeList" type="VBoxContainer" parent="Panel/VBox/Content/RecipeCol/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="SlotsCol" type="VBoxContainer" parent="Panel/VBox/Content"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="SlotsLabel" type="Label" parent="Panel/VBox/Content/SlotsCol"]
+layout_mode = 2
+text = "Ingots"
+
+[node name="SlotsContainer" type="VBoxContainer" parent="Panel/VBox/Content/SlotsCol"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="CloseButton" type="Button" parent="Panel/VBox"]
+layout_mode = 2
+text = "Close"

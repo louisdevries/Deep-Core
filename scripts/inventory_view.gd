@@ -55,6 +55,9 @@ func close() -> void:
 
 
 func rebuild() -> void:
+	print("Inventory rebuild — player: ", player)
+	print("Player ore: ", player.ore if player else "n/a")
+	print("Player resources: ", player.resources if player else "n/a")
 
 	for child in items_list.get_children():
 		child.queue_free()
@@ -76,7 +79,7 @@ func rebuild() -> void:
 
 
 func _add_row(material_id: String, count: int) -> void:
-
+	print("Adding row for: ", material_id, " count: ", count, " items_list: ", items_list)
 	var data: Dictionary = ResourceData.RESOURCES.get(material_id, {})
 	if data.is_empty():
 		return
@@ -101,3 +104,4 @@ func _add_row(material_id: String, count: int) -> void:
 	hbox.add_child(count_label)
 
 	items_list.add_child(row)
+	print("Row added. Total children now: ", items_list.get_child_count())

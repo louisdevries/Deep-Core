@@ -1,0 +1,52 @@
+[gd_scene format=3 uid="uid://b62fxc5efvlr1"]
+
+[ext_resource type="Script" uid="uid://blu1iiuyulvfr" path="res://scripts/shop_menu.gd" id="1_voj7l"]
+
+[node name="ShopMenu" type="CanvasLayer" unique_id=968044379]
+process_mode = 3
+script = ExtResource("1_voj7l")
+
+[node name="Panel" type="PanelContainer" parent="." unique_id=113523841]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -250.0
+offset_right = 200.0
+offset_bottom = 250.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBox" type="VBoxContainer" parent="Panel" unique_id=386105929]
+layout_mode = 2
+
+[node name="HeaderHBox" type="HBoxContainer" parent="Panel/VBox" unique_id=2112057706]
+layout_mode = 2
+
+[node name="TitleLabel" type="Label" parent="Panel/VBox/HeaderHBox" unique_id=613448521]
+layout_mode = 2
+text = "SHOP"
+horizontal_alignment = 1
+
+[node name="MoneyLabel" type="Label" parent="Panel/VBox/HeaderHBox" unique_id=1017007027]
+layout_mode = 2
+text = "$0"
+
+[node name="TabContainer" type="TabContainer" parent="Panel/VBox" unique_id=1676138989]
+layout_mode = 2
+current_tab = 0
+
+[node name="Sell" type="TabContainer" parent="Panel/VBox/TabContainer" unique_id=924218227]
+layout_mode = 2
+metadata/_tab_index = 0
+
+[node name="Buy" type="TabContainer" parent="Panel/VBox/TabContainer" unique_id=76724770]
+visible = false
+layout_mode = 2
+metadata/_tab_index = 1
+
+[node name="CloseButton" type="Button" parent="Panel/VBox" unique_id=1255902614]
+layout_mode = 2
+text = "Close"

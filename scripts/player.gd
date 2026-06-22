@@ -83,6 +83,7 @@ var spawn_position: Vector2
 var ui_health_bar
 
 var furnace_slot_count: int = 1
+var furnace_level: int = 1
 
 # RESOURCE STORAGE - all material types
 var resources = {
@@ -206,6 +207,7 @@ const TILE_CATEGORY := {
 	Vector2i(1, 6): "metal",     # uranium
 	Vector2i(2, 6): "metal",     # mythril
 	Vector2i(3, 6): "metal",     # adamantium
+	Vector2i(4, 6): "stone",    # concrete sounds like stone if anyone tries
 }
 
 # Particle colors per category
@@ -336,6 +338,9 @@ func _physics_process(delta):
 	check_hazard_contact(delta)
 	update_health(delta)
 
+	if ui_money_label:
+		ui_money_label.text = "$" + str(money)
+
 	if fuel <= 0 or is_dead:
 		velocity = Vector2.ZERO
 		return
@@ -354,9 +359,6 @@ func _physics_process(delta):
 
 	if ui_gear_label:
 		ui_gear_label.text = "Gear: " + str(drill_gear)
-
-	if ui_money_label:
-		ui_money_label.text = "$" + str(money)
 
 	if ui_cargo_label:
 		ui_cargo_label.text = "Cargo: " + str(cargo) + " / " + str(max_cargo)
@@ -913,6 +915,7 @@ func build_player_save() -> Dictionary:
 		"max_cable_length": max_cable_length,
 		"has_thrusters": has_thrusters,
 		"furnace_slot_count": furnace_slot_count,
+		"furnace_level": furnace_level,
 		"drill_count": drill_count,
 		"has_left_drill": has_left_drill,
 		"has_right_drill": has_right_drill,
@@ -949,6 +952,7 @@ func apply_player_save(save: Dictionary) -> void:
 		for key in storage.keys():
 			storage[key] = int(storage[key])
 	furnace_slot_count = save.get("furnace_slot_count", 1)
+	furnace_level = save.get("furnace_level", 1)
 	FurnaceSystem.slot_count = furnace_slot_count
 	if save.has("drill_direction"):
 		var d: Array = save["drill_direction"]
@@ -988,17 +992,11 @@ func _handle_swivel_input() -> void:
 
 
 func _find_refuel_anchor() -> Vector2:
-
-	var refuel := get_tree().get_first_node_in_group("refuel_zone")
-	if not refuel:
-		push_error("No node in 'refuel_zone' group — cable anchor will be wrong!")
+	var tether := get_tree().get_first_node_in_group("tether")
+	if not tether:
+		push_error("No node in 'tether' group — cable anchor will be wrong!")
 		return Vector2(0, 0)
-
-	var sprite := refuel.get_node_or_null("Sprite2D") as Node2D
-	if sprite:
-		return sprite.global_position
-
-	return refuel.global_position
+	return tether.global_position
 
 
 func _handle_free_movement(delta):

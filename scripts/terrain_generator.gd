@@ -185,9 +185,15 @@ func _ready():
 	generate_world()
 	fill_fog()
 	carve_caves()
+	
 
 	if not save.is_empty():
 		_apply_world_save(save)
+		
+	if save.has("cleared_cells") or save.has("hazards"):
+		_apply_world_save(save)
+		
+	_place_base_foundation()
 
 
 # -------------------------
@@ -626,11 +632,14 @@ func _apply_world_save(save: Dictionary) -> void:
 
 
 func mark_cleared(pos: Vector2i) -> void:
+	# Don't track concrete — it's structural, not drilled terrain
+	var existing: Vector2i = get_cell_atlas_coords(pos)
+	if existing == Vector2i(4, 6):   # concrete
+		return
 	cleared_cells[pos] = true
 
 
 func build_world_save() -> Dictionary:
-
 	var cleared: Array = []
 	for pos in cleared_cells.keys():
 		cleared.append(str(pos.x) + "," + str(pos.y))
@@ -645,9 +654,34 @@ func build_world_save() -> Dictionary:
 				"tx": tile.x,
 				"ty": tile.y
 			})
-
 	return {
 		"world_seed": world_seed,
 		"cleared_cells": cleared,
 		"hazards": hazards
 	}
+
+func _place_base_foundation() -> void:
+
+	const CONCRETE: Vector2i = Vector2i(4, 6)	
+	
+	var source: TileSetSource = tile_set.get_source(TILE_SOURCE_ID)
+	if source is TileSetAtlasSource:
+		var atlas: TileSetAtlasSource = source as TileSetAtlasSource
+		print("Concrete tile exists? ", atlas.has_tile(CONCRETE))
+		print("Available tiles in atlas:")
+		for i in atlas.get_tiles_count():
+			print("  ", atlas.get_tile_id(i))
+
+	var foundation_x_start: int = -world_width        # absolute left edge (-50)
+	var foundation_x_end: int = -world_width + 16     # 16 tiles wide — fits 5 buildings
+	var foundation_y_top: int = 0                     # inline with the grass surface
+	var foundation_y_bottom: int = 2                  # 2 tiles deep
+
+	for x in range(foundation_x_start, foundation_x_end):
+		for y in range(foundation_y_top, foundation_y_bottom):
+			set_cell(Vector2i(x, y), TILE_SOURCE_ID, CONCRETE)
+
+	# Wall on the right edge so the player can't bypass the base from underground
+	var wall_x: int = foundation_x_end
+	for y in range(foundation_y_top, foundation_y_bottom + 20):
+		set_cell(Vector2i(wall_x, y), TILE_SOURCE_ID, CONCRETE)

@@ -180,14 +180,16 @@ texture_normal = ExtResource("11_bdd5e")
 action = "cable_toggle"
 visibility_mode = 1
 
-[node name="InventoryButton" type="TouchScreenButton" parent="." unique_id=535010612]
-position = Vector2(1228, 11)
-scale = Vector2(2, 2)
+[node name="PauseButton" type="TouchScreenButton" parent="." unique_id=535010612]
+position = Vector2(1209, 5)
+scale = Vector2(3.4375, 4.3125)
 texture_normal = ExtResource("12_bswi6")
-action = "inventory"
-
-[node name="PauseButton" type="TouchScreenButton" parent="." unique_id=1533694308]
-position = Vector2(1228, 55)
-scale = Vector2(2, 2)
-texture_normal = ExtResource("13_ilxsp")
 action = "pause"
+visibility_mode = 1
+
+[node name="InventoryButton" type="TouchScreenButton" parent="." unique_id=1533694308]
+position = Vector2(1195, 84.00001)
+scale = Vector2(4.750007, 4.500002)
+texture_normal = ExtResource("13_ilxsp")
+action = "inventory"
+visibility_mode = 1

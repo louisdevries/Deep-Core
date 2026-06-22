@@ -1,0 +1,36 @@
+[gd_scene format=3 uid="uid://ck4nxmqp7r2tw"]
+
+[ext_resource type="Script" path="res://scripts/tether.gd" id="1_teth"]
+[ext_resource type="Texture2D" uid="uid://trd0dj05tqsa" path="res://assets/Equipment/tether_frame1.png" id="2_teth"]
+[ext_resource type="Texture2D" uid="uid://gl0vsrxiymsq" path="res://assets/Equipment/tether_frame2.png" id="3_teth"]
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_teth"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("2_teth")
+}, {
+"duration": 1.0,
+"texture": ExtResource("3_teth")
+}],
+"loop": true,
+"name": &"descend",
+"speed": 5.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("3_teth")
+}, {
+"duration": 1.0,
+"texture": ExtResource("2_teth")
+}],
+"loop": true,
+"name": &"ascend",
+"speed": 5.0
+}]
+
+[node name="Tether" type="Node2D" groups=["tether"]]
+script = ExtResource("1_teth")
+
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
+sprite_frames = SubResource("SpriteFrames_teth")

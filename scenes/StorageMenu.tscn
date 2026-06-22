@@ -1,0 +1,69 @@
+[gd_scene format=3 uid="uid://deeav7pl4udyy"]
+
+[ext_resource type="Script" path="res://scripts/storage_menu.gd" id="1_smenu"]
+
+[node name="StorageMenu" type="CanvasLayer"]
+process_mode = 3
+script = ExtResource("1_smenu")
+
+[node name="Panel" type="PanelContainer" parent="."]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -280.0
+offset_top = -220.0
+offset_right = 280.0
+offset_bottom = 220.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBox" type="VBoxContainer" parent="Panel"]
+layout_mode = 2
+
+[node name="TitleLabel" type="Label" parent="Panel/VBox"]
+layout_mode = 2
+text = "STORAGE"
+horizontal_alignment = 1
+
+[node name="Content" type="HBoxContainer" parent="Panel/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 12
+
+[node name="InventoryCol" type="VBoxContainer" parent="Panel/VBox/Content"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="InvHeader" type="Label" parent="Panel/VBox/Content/InventoryCol"]
+layout_mode = 2
+text = "Inventory  0 / 0"
+
+[node name="InvScroll" type="ScrollContainer" parent="Panel/VBox/Content/InventoryCol"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="InvList" type="VBoxContainer" parent="Panel/VBox/Content/InventoryCol/InvScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="StorageCol" type="VBoxContainer" parent="Panel/VBox/Content"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="StorHeader" type="Label" parent="Panel/VBox/Content/StorageCol"]
+layout_mode = 2
+text = "Storage  0 / 0"
+
+[node name="StorScroll" type="ScrollContainer" parent="Panel/VBox/Content/StorageCol"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="StorList" type="VBoxContainer" parent="Panel/VBox/Content/StorageCol/StorScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="CloseButton" type="Button" parent="Panel/VBox"]
+layout_mode = 2
+text = "Close"

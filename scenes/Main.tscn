@@ -1,30 +1,23 @@
 [gd_scene format=3 uid="uid://k6b71ppsug21"]
 
-[ext_resource type="Texture2D" uid="uid://2x6qnjfjrpp3" path="res://assets/FuelStation.png" id="2_0bbpv"]
 [ext_resource type="PackedScene" uid="uid://dhhrc3fb2u6xc" path="res://scenes/world.tscn" id="4_jlsqs"]
 [ext_resource type="PackedScene" uid="uid://btctoe0vkivh1" path="res://scenes/mobile_controls.tscn" id="4_rarhs"]
-[ext_resource type="Script" uid="uid://cg2054q45vhjb" path="res://scripts/refuel.gd" id="5_c01mt"]
 [ext_resource type="PackedScene" uid="uid://t7bj8oythijm" path="res://scenes/upgrade_menu.tscn" id="5_vcsgt"]
 [ext_resource type="PackedScene" uid="uid://dogf42auvxg8y" path="res://scenes/pause_menu.tscn" id="6_nxtc6"]
 [ext_resource type="PackedScene" uid="uid://b08sixsnx6su5" path="res://scenes/inventory_view.tscn" id="7_nxtc6"]
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_UpgradeButton"]
-bg_color = Color(0.25, 0.55, 0.2, 1)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0, 0, 0, 1)
-corner_radius_top_left = 14
-corner_radius_top_right = 14
-corner_radius_bottom_right = 14
-corner_radius_bottom_left = 14
+[ext_resource type="PackedScene" uid="uid://b62fxc5efvlr1" path="res://scenes/ShopMenu.tscn" id="11_smenu"]
+[ext_resource type="PackedScene" uid="uid://bm3xkqan2wy7c" path="res://scenes/furnace.tscn" id="12_furn"]
+[ext_resource type="PackedScene" uid="uid://cdvr4h5qt8nfg" path="res://scenes/shop_building.tscn" id="13_shop"]
+[ext_resource type="PackedScene" uid="uid://bk6j7wm2xp4nq" path="res://scenes/refuel_building.tscn" id="14_rf"]
+[ext_resource type="PackedScene" uid="uid://ck4nxmqp7r2tw" path="res://scenes/tether.tscn" id="15_teth"]
+[ext_resource type="PackedScene" uid="uid://dw0rksh0p001" path="res://scenes/workshop.tscn" id="16_wrkshp"]
+[ext_resource type="PackedScene" uid="uid://fuelmenu001" path="res://scenes/FuelMenu.tscn" id="17_fuel"]
+[ext_resource type="PackedScene" uid="uid://str0gebld001" path="res://scenes/storage_building.tscn" id="18_stor"]
+[ext_resource type="PackedScene" uid="uid://deeav7pl4udyy" path="res://scenes/StorageMenu.tscn" id="19_smenu"]
+[ext_resource type="PackedScene" path="res://scenes/FurnaceMenu.tscn" id="20_fmenu"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_0bbpv"]
 bg_color = Color(1, 0, 0.025840001, 1)
-
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_vcsgt"]
-size = Vector2(72, 70)
 
 [node name="Main" type="Node2D" unique_id=1240610508]
 
@@ -41,31 +34,20 @@ value = 100.0
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -220.0
-offset_top = 20.0
-offset_right = -20.0
-offset_bottom = 43.0
+offset_left = -209.0
+offset_top = 234.0
+offset_right = -9.0
+offset_bottom = 257.0
 grow_horizontal = 0
 text = "GearLabel"
 horizontal_alignment = 2
 
 [node name="MoneyLabel" type="Label" parent="UI" unique_id=2106990269 groups=["ui_money"]]
 offset_left = 18.0
-offset_top = 185.0
+offset_top = 152.0
 offset_right = 113.0
-offset_bottom = 208.0
+offset_bottom = 175.0
 text = "MoneyLabel"
-
-[node name="UpgradeButton" type="Button" parent="UI" unique_id=1010101010 groups=["ui_upgrade_button"]]
-offset_left = -211.0
-offset_top = 27.0
-offset_right = 29.0
-offset_bottom = 79.0
-theme_override_colors/font_color = Color(0, 0, 0, 1)
-theme_override_styles/normal = SubResource("StyleBoxFlat_UpgradeButton")
-theme_override_styles/pressed = SubResource("StyleBoxFlat_UpgradeButton")
-theme_override_styles/hover = SubResource("StyleBoxFlat_UpgradeButton")
-text = "OPEN UPGRADES"
 
 [node name="SonarLabel" type="Label" parent="UI" unique_id=370120572 groups=["ui_sonar"]]
 offset_left = 302.0
@@ -105,18 +87,6 @@ offset_right = 67.0
 offset_bottom = 112.0
 text = "Cable"
 
-[node name="RefuelZone" type="Area2D" parent="." unique_id=943789613 groups=["refuel_zone"]]
-position = Vector2(-38, 374.535)
-script = ExtResource("5_c01mt")
-
-[node name="CollisionShape2D" type="CollisionShape2D" parent="RefuelZone" unique_id=215024760]
-position = Vector2(-47, -361)
-shape = SubResource("RectangleShape2D_vcsgt")
-
-[node name="Sprite2D" type="Sprite2D" parent="RefuelZone" unique_id=1334353176]
-position = Vector2(-28.999998, -376.00003)
-texture = ExtResource("2_0bbpv")
-
 [node name="World" parent="." unique_id=1922870698 instance=ExtResource("4_jlsqs")]
 position = Vector2(34, 22)
 
@@ -129,4 +99,40 @@ visible = false
 visible = false
 
 [node name="InventoryView" parent="." unique_id=1228721132 instance=ExtResource("7_nxtc6")]
+visible = false
+
+[node name="ShopMenu" parent="." unique_id=-1994967295 instance=ExtResource("11_smenu")]
+visible = false
+
+[node name="RefuelStation" parent="." unique_id=-1994967294 instance=ExtResource("14_rf")]
+z_index = -2
+position = Vector2(-734, -8)
+
+[node name="Shop" parent="." unique_id=-1994967293 instance=ExtResource("13_shop")]
+z_index = -2
+position = Vector2(-686, 6)
+
+[node name="Furnace" parent="." unique_id=-1994967292 instance=ExtResource("12_furn")]
+z_index = -2
+position = Vector2(-638, 6)
+
+[node name="Workshop" parent="." unique_id=-1994967290 instance=ExtResource("16_wrkshp")]
+z_index = -2
+position = Vector2(-590, 6)
+
+[node name="StorageBuilding" parent="." unique_id=-1994967288 instance=ExtResource("18_stor")]
+z_index = -2
+position = Vector2(-542, 6)
+
+[node name="Tether" parent="." unique_id=-1994967291 instance=ExtResource("15_teth")]
+z_index = -1
+position = Vector2(-518, 14)
+
+[node name="FuelMenu" parent="." unique_id=-1994967289 instance=ExtResource("17_fuel")]
+visible = false
+
+[node name="StorageMenu" parent="." unique_id=-1994967287 instance=ExtResource("19_smenu")]
+visible = false
+
+[node name="FurnaceMenu" parent="." unique_id=2300000010 instance=ExtResource("20_fmenu")]
 visible = false

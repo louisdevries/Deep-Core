@@ -264,5 +264,12 @@ const TERRAIN_TYPES = {
 		"required_power": 12,
 		"cargo": 8,
 		"resource": "adamantium"
-	}
+	},
+	
+	Vector2i(4, 6): {
+		"name": "Concrete",
+		"required_power": 9999,    # effectively undrillable
+		"cargo": 0,
+		"resource": null
+	},
 }

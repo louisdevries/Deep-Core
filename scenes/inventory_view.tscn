@@ -41,6 +41,7 @@ layout_mode = 2
 text = "0 / 20"
 
 [node name="ScrollContainer" type="ScrollContainer" parent="Panel/VBox" unique_id=1654155394]
+custom_minimum_size = Vector2(0, 300)
 layout_mode = 2
 
 [node name="ItemsList" type="VBoxContainer" parent="Panel/VBox/ScrollContainer" unique_id=326238991]
