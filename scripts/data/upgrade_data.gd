@@ -9,17 +9,17 @@ const CATEGORY_CAPACITY := "Capacity"
 # Each tier has: cost, resources_required, effect (applied to player when bought)
 const UPGRADES := {
 
-	"drill_power": {
-		"name": "Drill Power",
+	"drill_tier": {
+		"name": "Drill Upgrade",
 		"category": CATEGORY_DRILLING,
-		"description": "Break harder rocks and ores.",
-		"player_var": "drill_power",
+		"description": "Upgrade to a more powerful drill. Bronze → Steel → Reinforced Steel → Titanium → Diamond → Plasma.",
+		"player_var": "drill_tier",
 		"tiers": [
-			{ "money": 50,   "resources": {} },
-			{ "money": 250,  "resources": { "copper": 5 } },
-			{ "money": 750,  "resources": { "copper": 15, "iron": 5 } },
-			{ "money": 2000, "resources": { "iron": 20 } },
-			{ "money": 5000, "resources": { "iron": 25, "crystal": 10 } },
+			{ "money": 500,   "resources": { "copper": 15, "tin": 10 } },                     # Steel
+			{ "money": 1000,  "resources": { "iron": 20, "coal": 30 } },                      # Reinforced Steel
+			{ "money": 3000,  "resources": { "titanium": 15, "tungsten": 8 } },               # Titanium
+			{ "money": 10000, "resources": { "diamond": 3, "titanium": 10, "tungsten": 5 } }, # Diamond
+			{ "money": 50000, "resources": { "uranium": 5, "mythril": 3, "crystal": 20 } },   # Plasma
 		]
 	},
 
@@ -70,25 +70,16 @@ const UPGRADES := {
 		]
 	},
 
-	"cable_length": {
-		"name": "Cable Length",
+	"thruster_power": {
+		"name": "Thruster Power",
 		"category": CATEGORY_EQUIPMENT,
-		"description": "How far down the cable can extend.",
-		"player_var": "max_cable_length",
+		"description": "Increases thruster output for faster ascent and better fall control.",
+		"player_var": "thruster_force",
 		"tiers": [
-			{ "money": 300,  "resources": {} },
-			{ "money": 1000, "resources": { "copper": 10 } },
-			{ "money": 3000, "resources": { "iron": 15 } },
-			{ "money": 8000, "resources": { "iron": 20, "crystal": 10 } },
-		]
-	},
-	"thrusters": {
-		"name": "Thrusters",
-		"category": CATEGORY_EQUIPMENT,
-		"description": "Vertical thrust for short bursts. Fast ascent at the cost of fuel.",
-		"player_var": "has_thrusters",
-		"tiers": [
-			{ "money": 1500, "resources": { "copper": 15, "iron": 5 } },
+			{ "money": 500,   "resources": { "copper": 10 } },
+			{ "money": 1500,  "resources": { "iron": 10, "copper": 15 } },
+			{ "money": 4000,  "resources": { "iron": 20, "titanium": 3 } },
+			{ "money": 10000, "resources": { "titanium": 10, "crystal": 5 } },
 		]
 	},
 	"furnace_slots": {
@@ -150,13 +141,12 @@ const UPGRADES := {
 
 # Helper: derive starting tier for each upgrade (used to count current level vs max)
 const STARTING_VALUES := {
-	"drill_power": 1,
+	"drill_tier": 0,
 	"drill_swivel_tier": 1,
 	"sonar_range": 8,
 	"max_cargo": 20,
 	"max_fuel": 100.0,
-	"max_cable_length": 1200.0,
-	"has_thrusters": false,
+	"thruster_force": 200.0,
 	"drill_count": 1,
 	"has_left_drill": false,
 	"has_right_drill": false,
@@ -167,13 +157,12 @@ const STARTING_VALUES := {
 # How much each tier upgrade changes the player_var
 # For most things this is +1; for capacity/range we want bigger jumps
 const TIER_INCREMENTS := {
-	"drill_power": 1,
+	"drill_tier": 1,
 	"drill_swivel_tier": 1,
 	"sonar_range": 3,    # +3 tiles per tier
 	"max_cargo": 15,     # +15 per tier
 	"max_fuel": 50.0,     # +50 per tier
-	"max_cable_length": 400.0,   # +25 tiles per upgrade
-	"has_thrusters": true,
+	"thruster_force": 200.0,
 	"drill_count": 1,    # +1 per tier
 	"has_left_drill": true,
 	"has_right_drill": true,

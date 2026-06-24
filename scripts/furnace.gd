@@ -46,7 +46,6 @@ func _apply_level_sprites(level: int) -> void:
 	sprite_off.texture = OFF_TEXTURES[idx]
 
 	var frames := SpriteFrames.new()
-	frames.add_animation("default")
 	frames.set_animation_speed("default", 5.0)
 	frames.set_animation_loop("default", true)
 	frames.add_frame("default", ANIM_TEXTURES[idx][0])

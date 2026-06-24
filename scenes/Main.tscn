@@ -1,5 +1,6 @@
 [gd_scene format=3 uid="uid://k6b71ppsug21"]
 
+[ext_resource type="PackedScene" uid="uid://citmmenu001" path="res://scenes/ItemMenu.tscn" id="21_itmm"]
 [ext_resource type="PackedScene" uid="uid://dhhrc3fb2u6xc" path="res://scenes/world.tscn" id="4_jlsqs"]
 [ext_resource type="PackedScene" uid="uid://btctoe0vkivh1" path="res://scenes/mobile_controls.tscn" id="4_rarhs"]
 [ext_resource type="PackedScene" uid="uid://t7bj8oythijm" path="res://scenes/upgrade_menu.tscn" id="5_vcsgt"]
@@ -9,7 +10,6 @@
 [ext_resource type="PackedScene" uid="uid://bm3xkqan2wy7c" path="res://scenes/furnace.tscn" id="12_furn"]
 [ext_resource type="PackedScene" uid="uid://cdvr4h5qt8nfg" path="res://scenes/shop_building.tscn" id="13_shop"]
 [ext_resource type="PackedScene" uid="uid://bk6j7wm2xp4nq" path="res://scenes/refuel_building.tscn" id="14_rf"]
-[ext_resource type="PackedScene" uid="uid://ck4nxmqp7r2tw" path="res://scenes/tether.tscn" id="15_teth"]
 [ext_resource type="PackedScene" uid="uid://dw0rksh0p001" path="res://scenes/workshop.tscn" id="16_wrkshp"]
 [ext_resource type="PackedScene" uid="uid://fuelmenu001" path="res://scenes/FuelMenu.tscn" id="17_fuel"]
 [ext_resource type="PackedScene" uid="uid://str0gebld001" path="res://scenes/storage_building.tscn" id="18_stor"]
@@ -72,20 +72,12 @@ offset_right = 414.0
 offset_bottom = 51.0
 text = "Drill Direction"
 
-[node name="CableBar" type="ProgressBar" parent="UI" unique_id=86497349 groups=["ui_cable_bar"]]
+[node name="ItemsButton" type="Button" parent="UI" unique_id=89100001]
 offset_left = 20.0
-offset_top = 116.0
-offset_right = 220.0
-offset_bottom = 143.0
-tooltip_text = "Cable"
-max_value = 800.0
-
-[node name="CableLabel" type="Label" parent="UI" unique_id=560616191 groups=["ui_cable_label"]]
-offset_left = 23.0
-offset_top = 89.0
-offset_right = 67.0
+offset_top = 85.0
+offset_right = 115.0
 offset_bottom = 112.0
-text = "Cable"
+text = "Items"
 
 [node name="World" parent="." unique_id=1922870698 instance=ExtResource("4_jlsqs")]
 position = Vector2(34, 22)
@@ -124,10 +116,6 @@ position = Vector2(-590, 6)
 z_index = -2
 position = Vector2(-542, 6)
 
-[node name="Tether" parent="." unique_id=-1994967291 instance=ExtResource("15_teth")]
-z_index = -1
-position = Vector2(-518, 14)
-
 [node name="FuelMenu" parent="." unique_id=-1994967289 instance=ExtResource("17_fuel")]
 visible = false
 
@@ -136,3 +124,8 @@ visible = false
 
 [node name="FurnaceMenu" parent="." unique_id=2300000010 instance=ExtResource("20_fmenu")]
 visible = false
+
+[node name="ItemMenu" parent="." unique_id=89100002 instance=ExtResource("21_itmm")]
+visible = false
+
+[connection signal="pressed" from="UI/ItemsButton" to="ItemMenu" method="open_for_current_player"]

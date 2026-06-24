@@ -36,16 +36,22 @@ text = "$0"
 
 [node name="TabContainer" type="TabContainer" parent="Panel/VBox" unique_id=1676138989]
 layout_mode = 2
+size_flags_vertical = 3
 current_tab = 0
 
-[node name="Sell" type="TabContainer" parent="Panel/VBox/TabContainer" unique_id=924218227]
+[node name="Sell" type="VBoxContainer" parent="Panel/VBox/TabContainer" unique_id=924218227]
 layout_mode = 2
 metadata/_tab_index = 0
 
-[node name="Buy" type="TabContainer" parent="Panel/VBox/TabContainer" unique_id=76724770]
+[node name="Buy" type="VBoxContainer" parent="Panel/VBox/TabContainer" unique_id=76724770]
 visible = false
 layout_mode = 2
 metadata/_tab_index = 1
+
+[node name="BlackMarket" type="VBoxContainer" parent="Panel/VBox/TabContainer" unique_id=77000001]
+visible = false
+layout_mode = 2
+metadata/_tab_index = 2
 
 [node name="CloseButton" type="Button" parent="Panel/VBox" unique_id=1255902614]
 layout_mode = 2
