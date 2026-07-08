@@ -28,15 +28,15 @@ func setup(
 	var icon_path: String = ""
 	match item_id:
 		"dynamite":
-			icon_path  = "res://assets/Tools/dynamite.png"
+			icon_path  = "res://assets/Art/Tools/dynamite.png"
 			tier_bonus = 1
 			_active    = true
 		"shaped_charge":
-			icon_path  = "res://assets/Tools/vertical_charge.png"
+			icon_path  = "res://assets/Art/Tools/vertical_charge.png"
 			tier_bonus = 2
 			_active    = true
 		"phase_beacon":
-			icon_path = "res://assets/Tools/phase_beacon.png"
+			icon_path = "res://assets/Art/Tools/phase_beacon.png"
 			# Beacon doesn't auto-detonate; persists until player returns
 
 	if icon_path != "":
@@ -65,6 +65,13 @@ func _process(delta: float) -> void:
 func _explode() -> void:
 	if not terrain or not player:
 		return
+
+	var sfx := AudioStreamPlayer.new()
+	sfx.stream = load("res://assets/Audio/SFX/Dynamite.wav")
+	sfx.bus = "SFX"
+	get_tree().current_scene.add_child(sfx)
+	sfx.play()
+	sfx.finished.connect(sfx.queue_free)
 
 	var center_tile := terrain.local_to_map(terrain.to_local(global_position))
 	var max_breakable_tier: int = player.drill_tier + 1 + tier_bonus

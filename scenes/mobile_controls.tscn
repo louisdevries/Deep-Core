@@ -1,195 +1,102 @@
 [gd_scene format=3 uid="uid://btctoe0vkivh1"]
 
 [ext_resource type="Script" uid="uid://dypuve8noc4br" path="res://scripts/mobile_controls.gd" id="1_l7u83"]
-[ext_resource type="Texture2D" uid="uid://bip0wml5wret6" path="res://assets/arrow_left.png" id="2_cnqve"]
-[ext_resource type="Texture2D" uid="uid://jrvlfl1xjlsk" path="res://assets/arrow_right.png" id="3_kffq0"]
-[ext_resource type="Texture2D" uid="uid://bfsj3s55isvfv" path="res://assets/gear_three.png" id="3_y1te1"]
-[ext_resource type="Texture2D" uid="uid://nrrghr80lwpb" path="res://assets/arrow_up.png" id="4_bswi6"]
-[ext_resource type="Texture2D" uid="uid://dhbqjcm3kqbal" path="res://assets/gear_two.png" id="4_puaky"]
-[ext_resource type="Texture2D" uid="uid://d4mcyap3g00hb" path="res://assets/arrow_down.png" id="5_ilxsp"]
-[ext_resource type="Texture2D" uid="uid://dyh4nbuk0modo" path="res://assets/gear_one.png" id="5_yr8f1"]
-[ext_resource type="Texture2D" uid="uid://jmqss55gwuwr" path="res://assets/drill.png" id="6_saaj3"]
-[ext_resource type="Texture2D" uid="uid://cp1gtafer34qi" path="res://assets/sonar.png" id="7_jnbrs"]
-[ext_resource type="Texture2D" uid="uid://cxyhv7jig2d6g" path="res://assets/cable.png" id="11_bdd5e"]
-[ext_resource type="Texture2D" uid="uid://ceiloedh01aq1" path="res://assets/ui_pause.png" id="12_bswi6"]
-[ext_resource type="Texture2D" uid="uid://cl2dt450f7ghq" path="res://assets/ui_inventory.png" id="13_ilxsp"]
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn"]
-bg_color = Color(0.05, 0.05, 0.14, 0.5)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.45, 0.45, 0.65, 0.65)
-corner_radius_top_left = 12
-corner_radius_top_right = 12
-corner_radius_bottom_right = 12
-corner_radius_bottom_left = 12
+[ext_resource type="Texture2D" uid="uid://dw8n2sjon6j1t" path="res://assets/Art/UI/arrow_left.png" id="2_k6aum"]
+[ext_resource type="Texture2D" uid="uid://btmsipuswe0kc" path="res://assets/Art/UI/arrow_right.png" id="3_cnqve"]
+[ext_resource type="Texture2D" uid="uid://b0eg8lyci80hh" path="res://assets/Art/UI/ui_drill.png" id="4_kffq0"]
+[ext_resource type="Texture2D" uid="uid://ceipsb1smgxwj" path="res://assets/Art/UI/ui_sonar.png" id="5_bswi6"]
+[ext_resource type="Texture2D" uid="uid://ba8d0pp3nwyei" path="res://assets/Art/UI/ui_pause.png" id="9_cnqve"]
+[ext_resource type="Texture2D" uid="uid://br0luoq6oxv4j" path="res://assets/Art/UI/ui_inventory.png" id="10_kffq0"]
+[ext_resource type="Texture2D" uid="uid://bjgifvlraqipe" path="res://assets/Art/UI/ui_thrusters.png" id="11_cnqve"]
+[ext_resource type="PackedScene" uid="uid://cc0pxbawl51gn" path="res://scenes/gear_knob.tscn" id="12_kffq0"]
+[ext_resource type="PackedScene" uid="uid://dswvlknb0011" path="res://scenes/swivel_knob.tscn" id="13_swivl"]
+[ext_resource type="Script" uid="uid://dxtnra1h3tbbt" path="res://scripts/sonar_cooldown_overlay.gd" id="14_sonar"]
+[ext_resource type="PackedScene" uid="uid://qkslot001" path="res://scenes/quick_slot.tscn" id="15_qslot"]
 
 [node name="MobileControls" type="CanvasLayer" unique_id=2106365054]
 layer = 10
 script = ExtResource("1_l7u83")
 
-[node name="BgDPadLeft" type="Panel" parent="." unique_id=1938392109]
-offset_left = 12.0
-offset_top = 563.0
-offset_right = 92.0
-offset_bottom = 642.0
-mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_btn")
-
-[node name="BgDPadRight" type="Panel" parent="." unique_id=1975318883]
-offset_left = 168.0
-offset_top = 564.0
-offset_right = 250.0
-offset_bottom = 642.0
-mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_btn")
-
-[node name="BgDPadUp" type="Panel" parent="." unique_id=418818808]
-offset_left = 91.0
-offset_top = 486.0
-offset_right = 172.0
-offset_bottom = 564.0
-mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_btn")
-
-[node name="BgDPadDown" type="Panel" parent="." unique_id=1772075023]
-offset_left = 89.0
-offset_top = 638.0
-offset_right = 168.0
-offset_bottom = 717.0
-mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_btn")
-
-[node name="BgGear1" type="Panel" parent="." unique_id=1857258587]
-offset_left = 503.0
-offset_top = 636.0
-offset_right = 584.0
-offset_bottom = 714.0
-mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_btn")
-
-[node name="BgGear2" type="Panel" parent="." unique_id=1377437165]
-offset_left = 595.0
-offset_top = 634.0
-offset_right = 675.0
-offset_bottom = 714.0
-mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_btn")
-
-[node name="BgGear3" type="Panel" parent="." unique_id=1846081051]
-offset_left = 687.0
-offset_top = 634.0
-offset_right = 766.0
-offset_bottom = 714.0
-mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_btn")
-
-[node name="BgDrill" type="Panel" parent="." unique_id=1531112166]
-offset_left = 1175.0
-offset_top = 540.0
-offset_right = 1253.0
-offset_bottom = 619.0
-mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_btn")
-
-[node name="BgSonar" type="Panel" parent="." unique_id=1168737237]
-offset_left = 1092.0
-offset_top = 468.0
-offset_right = 1171.0
-offset_bottom = 547.0
-mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_btn")
-
-[node name="BgCable" type="Panel" parent="." unique_id=117475723]
-offset_left = 1098.0
-offset_top = 623.0
-offset_right = 1177.0
-offset_bottom = 702.0
-mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_btn")
-
 [node name="DPadLeft" type="TouchScreenButton" parent="." unique_id=610532341]
 position = Vector2(16.000015, 565)
-scale = Vector2(0.022, 0.022)
-texture_normal = ExtResource("2_cnqve")
+scale = Vector2(3, 3)
+texture_normal = ExtResource("2_k6aum")
 action = "ui_left"
 visibility_mode = 1
 
 [node name="DPadRight" type="TouchScreenButton" parent="." unique_id=2061665836]
 position = Vector2(171.00006, 565)
-scale = Vector2(0.022, 0.022)
-texture_normal = ExtResource("3_kffq0")
+scale = Vector2(3, 3)
+texture_normal = ExtResource("3_cnqve")
 action = "ui_right"
 visibility_mode = 1
 
-[node name="DPadUp" type="TouchScreenButton" parent="." unique_id=1216995528]
-position = Vector2(93.000046, 491)
-scale = Vector2(0.022, 0.02)
-texture_normal = ExtResource("4_bswi6")
-action = "ui_up"
-visibility_mode = 1
-
-[node name="DPadDown" type="TouchScreenButton" parent="." unique_id=2036685858]
-position = Vector2(92.000015, 639)
-scale = Vector2(0.022, 0.022)
-texture_normal = ExtResource("5_ilxsp")
-action = "ui_down"
-visibility_mode = 1
-
 [node name="DrillButton" type="TouchScreenButton" parent="." unique_id=1906388821]
-position = Vector2(1176, 537)
-scale = Vector2(0.0656029, 0.07347516)
-texture_normal = ExtResource("6_saaj3")
+position = Vector2(1173, 602)
+scale = Vector2(3, 3)
+texture_normal = ExtResource("4_kffq0")
 action = "ui_accept"
 visibility_mode = 1
 
 [node name="SonarButton" type="TouchScreenButton" parent="." unique_id=611506982]
-position = Vector2(1098, 474)
-scale = Vector2(0.13, 0.13)
-texture_normal = ExtResource("7_jnbrs")
+position = Vector2(1059, 602)
+scale = Vector2(3, 3)
+texture_normal = ExtResource("5_bswi6")
 action = "sonar"
 visibility_mode = 1
 
-[node name="GearButton1" type="TouchScreenButton" parent="." unique_id=1347821095]
-position = Vector2(509.00003, 640)
-scale = Vector2(0.072, 0.072)
-texture_normal = ExtResource("5_yr8f1")
-action = "set_gear_1"
-visibility_mode = 1
-
-[node name="GearButton2" type="TouchScreenButton" parent="." unique_id=1347821094]
-position = Vector2(600.00006, 639)
-scale = Vector2(0.072, 0.072)
-texture_normal = ExtResource("4_puaky")
-action = "set_gear_2"
-visibility_mode = 1
-
-[node name="GearButton3" type="TouchScreenButton" parent="." unique_id=1347821093]
-position = Vector2(692.00006, 639)
-scale = Vector2(0.07230137, 0.07346939)
-texture_normal = ExtResource("3_y1te1")
-action = "set_gear_3"
-visibility_mode = 1
-
-[node name="CableToggleButton" type="TouchScreenButton" parent="." unique_id=1347821096]
-position = Vector2(1101, 623)
-scale = Vector2(0.05562498, 0.059523802)
-texture_normal = ExtResource("11_bdd5e")
-action = "cable_toggle"
-visibility_mode = 1
-
 [node name="PauseButton" type="TouchScreenButton" parent="." unique_id=535010612]
-position = Vector2(1209, 5)
-scale = Vector2(3.4375, 4.3125)
-texture_normal = ExtResource("12_bswi6")
+position = Vector2(1176, 21)
+scale = Vector2(3, 3)
+texture_normal = ExtResource("9_cnqve")
 action = "pause"
 visibility_mode = 1
 
 [node name="InventoryButton" type="TouchScreenButton" parent="." unique_id=1533694308]
-position = Vector2(1195, 84.00001)
-scale = Vector2(4.750007, 4.500002)
-texture_normal = ExtResource("13_ilxsp")
+position = Vector2(1063, 23)
+scale = Vector2(3, 3)
+texture_normal = ExtResource("10_kffq0")
 action = "inventory"
 visibility_mode = 1
+
+[node name="ThrusterButton" type="TouchScreenButton" parent="." unique_id=255218228]
+position = Vector2(952, 599)
+scale = Vector2(3, 3)
+texture_normal = ExtResource("11_cnqve")
+action = "ui_up"
+visibility_mode = 1
+
+[node name="GearKnob" parent="." unique_id=102587164 instance=ExtResource("12_kffq0")]
+offset_left = 1148.0
+offset_top = 228.0
+offset_right = 1228.0
+offset_bottom = 428.0
+
+[node name="SonarOverlay" type="Node2D" parent="." unique_id=300000001]
+position = Vector2(1107, 650)
+script = ExtResource("14_sonar")
+
+[node name="QuickSlot1" parent="." unique_id=400100001 instance=ExtResource("15_qslot")]
+layout_mode = 3
+anchors_preset = 0
+offset_left = 962.0
+offset_top = 513.0
+offset_right = 1038.0
+offset_bottom = 589.0
+
+[node name="QuickSlot2" parent="." unique_id=400100002 instance=ExtResource("15_qslot")]
+layout_mode = 3
+anchors_preset = 0
+offset_left = 1069.0
+offset_top = 513.0
+offset_right = 1145.0
+offset_bottom = 589.0
+slot_index = 1
+
+[node name="SwivelKnob" parent="." unique_id=200100001 instance=ExtResource("13_swivl")]
+layout_mode = 3
+anchors_preset = 0
+offset_left = 468.0
+offset_top = 580.0
+offset_right = 708.0
+offset_bottom = 640.0

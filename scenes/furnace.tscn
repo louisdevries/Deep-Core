@@ -1,20 +1,20 @@
 [gd_scene format=3 uid="uid://bm3xkqan2wy7c"]
 
 [ext_resource type="Script" uid="uid://cnvykcuuma176" path="res://scripts/furnace.gd" id="1_furn"]
-[ext_resource type="Texture2D" uid="uid://wx8tdse7h2r0" path="res://assets/Equipment/furnace_level1_off.png" id="2_furn"]
-[ext_resource type="Texture2D" uid="uid://boh18papavn5m" path="res://assets/Equipment/furnace_level1_frame1.png" id="3_furn"]
-[ext_resource type="Texture2D" uid="uid://bli022ej03uxu" path="res://assets/Equipment/furnace_level1_frame2.png" id="4_furn"]
+[ext_resource type="Texture2D" uid="uid://bc5iacdambmys" path="res://assets/Art/Buildings/Furnace.png" id="2_kcyua"]
+[ext_resource type="Texture2D" uid="uid://mn7sr66vt0p2" path="res://assets/Art/Buildings/Furnace_Off.png" id="2_s82ge"]
+[ext_resource type="Texture2D" uid="uid://4ycjes31b6no" path="res://assets/Art/Buildings/Furnace_2.png" id="4_5cqhb"]
 
 [sub_resource type="SpriteFrames" id="SpriteFrames_furn"]
 animations = [{
 "frames": [{
 "duration": 1.0,
-"texture": ExtResource("3_furn")
+"texture": ExtResource("2_kcyua")
 }, {
 "duration": 1.0,
-"texture": ExtResource("4_furn")
+"texture": ExtResource("4_5cqhb")
 }],
-"loop": true,
+"loop": 1,
 "name": &"default",
 "speed": 5.0
 }]
@@ -22,17 +22,19 @@ animations = [{
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_furn"]
 size = Vector2(32, 32)
 
-[node name="Furnace" type="Node2D"]
+[node name="Furnace" type="Node2D" unique_id=892837035]
 script = ExtResource("1_furn")
 
-[node name="SpriteOff" type="Sprite2D" parent="."]
-texture = ExtResource("2_furn")
-
-[node name="SpriteOn" type="AnimatedSprite2D" parent="."]
+[node name="SpriteOff" type="Sprite2D" parent="." unique_id=714794749]
 visible = false
+texture = ExtResource("2_s82ge")
+
+[node name="SpriteOn" type="AnimatedSprite2D" parent="." unique_id=1473842957]
 sprite_frames = SubResource("SpriteFrames_furn")
+frame_progress = 0.046992745
 
-[node name="Area2D" type="Area2D" parent="."]
+[node name="Area2D" type="Area2D" parent="." unique_id=1562732824]
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=1530493093]
+scale = Vector2(2, 2)
 shape = SubResource("RectangleShape2D_furn")

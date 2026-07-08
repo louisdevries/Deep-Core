@@ -37,7 +37,7 @@ const ITEMS: Dictionary = {
 		"cost": 250,
 		"tier": 2,
 		"use_type": "place",
-		"icon_path": "res://assets/Tools/dynamite.png",
+		"icon_path": "res://assets/Art/Tools/dynamite.png",
 		"fuse_time": 1.5,
 		"tier_bonus": 1,
 	},
@@ -63,7 +63,7 @@ const ITEMS: Dictionary = {
 		"cost": 600,
 		"tier": 3,
 		"use_type": "place",
-		"icon_path": "res://assets/Tools/vertical_charge.png",
+		"icon_path": "res://assets/Art/Tools/vertical_charge.png",
 		"fuse_time": 1.5,
 		"tier_bonus": 2,
 	},
@@ -80,7 +80,7 @@ const ITEMS: Dictionary = {
 		"cost": 1000,
 		"tier": 3,
 		"use_type": "place_return",
-		"icon_path": "res://assets/Tools/phase_beacon.png",
+		"icon_path": "res://assets/Art/Tools/phase_beacon.png",
 	},
 }
 

@@ -1,18 +1,19 @@
 [gd_scene format=3 uid="uid://str0gebld001"]
 
-[ext_resource type="Script" path="res://scripts/storage_building.gd" id="1_stor"]
-[ext_resource type="Texture2D" path="res://assets/Equipment/storage.png" id="2_stor"]
+[ext_resource type="Script" uid="uid://cjphmi31u5wjr" path="res://scripts/storage_building.gd" id="1_stor"]
+[ext_resource type="Texture2D" uid="uid://dpsyohstn7v3u" path="res://assets/Art/Buildings/Storage.png" id="2_3xwj7"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_stor"]
 size = Vector2(32, 32)
 
-[node name="StorageBuilding" type="Node2D" groups=["building"]]
+[node name="StorageBuilding" type="Node2D" unique_id=398355881 groups=["building"]]
 script = ExtResource("1_stor")
 
-[node name="Sprite2D" type="Sprite2D" parent="."]
-texture = ExtResource("2_stor")
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=421596010]
+texture = ExtResource("2_3xwj7")
 
-[node name="Area2D" type="Area2D" parent="."]
+[node name="Area2D" type="Area2D" parent="." unique_id=1627842610]
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=10099896]
+scale = Vector2(2, 2)
 shape = SubResource("RectangleShape2D_stor")

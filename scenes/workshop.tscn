@@ -1,18 +1,19 @@
 [gd_scene format=3 uid="uid://dw0rksh0p001"]
 
-[ext_resource type="Script" path="res://scripts/workshop.gd" id="1_wrk"]
-[ext_resource type="Texture2D" path="res://assets/Equipment/workshop.png" id="2_wrk"]
+[ext_resource type="Script" uid="uid://v5ocamop8ccd" path="res://scripts/workshop.gd" id="1_wrk"]
+[ext_resource type="Texture2D" uid="uid://bbpgllw6ey7rf" path="res://assets/Art/Buildings/Workshop.png" id="2_wwo6w"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_wrk"]
 size = Vector2(32, 32)
 
-[node name="Workshop" type="Node2D" groups=["building"]]
+[node name="Workshop" type="Node2D" unique_id=527913216 groups=["building"]]
 script = ExtResource("1_wrk")
 
-[node name="Sprite2D" type="Sprite2D" parent="."]
-texture = ExtResource("2_wrk")
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=1640256015]
+texture = ExtResource("2_wwo6w")
 
-[node name="Area2D" type="Area2D" parent="."]
+[node name="Area2D" type="Area2D" parent="." unique_id=713061610]
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=1983965738]
+scale = Vector2(2, 2)
 shape = SubResource("RectangleShape2D_wrk")

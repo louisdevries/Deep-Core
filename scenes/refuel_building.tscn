@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://bk6j7wm2xp4nq"]
 
 [ext_resource type="Script" uid="uid://btyqsuonoglv8" path="res://scripts/refuel_station.gd" id="1_rf"]
-[ext_resource type="Texture2D" uid="uid://1dpncivrwsji" path="res://assets/Equipment/fuel_station.png" id="2_t3fvk"]
+[ext_resource type="Texture2D" uid="uid://65ai2cviognb" path="res://assets/Art/Buildings/Fuel.png" id="2_t3fvk"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_rf"]
 size = Vector2(32, 64)

@@ -1,0 +1,7 @@
+[gd_scene format=3 uid="uid://qkslot001"]
+
+[ext_resource type="Script" path="res://scripts/quick_slot_button.gd" id="1_qslot"]
+
+[node name="QuickSlot" type="Control" unique_id=400000001]
+custom_minimum_size = Vector2(76, 76)
+script = ExtResource("1_qslot")

@@ -199,7 +199,13 @@ const TERRAIN_TYPES = {
 		"name": "Diamond",
 		"material_tier": 5,
 		"cargo": 6,
-		"resource": "diamond"
+		"resource": "diamond",
+		"mining_hazard": {
+			"chance_per_tick": 0.15,
+			"damage": 3.0,
+			"prevented_by_var": "drill_tier",
+			"safe_tier": 4    # Diamond drill (tier 4 in 0-indexed) prevents it
+		}
 	},
 
 	# ============================
@@ -212,7 +218,15 @@ const TERRAIN_TYPES = {
 		"cargo": 0,
 		"resource": null,
 		"hazard": "lava",
-		"contact_damage": 25.0
+		"contact_damage": 25.0,
+		"hazards": {
+			"heat": {
+				"damage": 2.0,
+				"radius": 2,
+				"protection_var": "heat_shield_tier",
+				"protection_levels": [0.0, 0.5, 0.8, 1.0]
+			}
+		}
 	},
 
 	Vector2i(1, 5): {
@@ -222,7 +236,9 @@ const TERRAIN_TYPES = {
 		"resource": null,
 		"hazard": "gas",
 		"fuel_damage": 20.0,
-		"contact_damage": 0.0
+		"contact_damage": 0.0,
+		"fuel_protection_var": "cabin_tier",
+		"fuel_protection_levels": [0.0, 0.5, 0.75, 1.0]
 	},
 
 	Vector2i(2, 5): {
@@ -259,7 +275,15 @@ const TERRAIN_TYPES = {
 		"material_tier": 6,
 		"cargo": 4,
 		"resource": "uranium",
-		"contact_damage": 5.0
+		"contact_damage": 5.0,
+		"hazards": {
+			"radiation": {
+				"damage": 5.0,
+				"radius": 2,
+				"protection_var": "cabin_tier",
+				"protection_levels": [0.0, 0.5, 0.75, 1.0]
+			}
+		}
 	},
 
 	Vector2i(2, 6): {

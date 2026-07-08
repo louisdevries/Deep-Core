@@ -127,13 +127,89 @@ const RESOURCES = {
 		"value": 5000,
 		"color": Color(0.4, 0.5, 0.6, 1.0)
 	},
+
+	# REFINED (furnace outputs)
+	"copper_bar": {
+		"display_name": "Copper Bar",
+		"value": 100,
+		"color": Color(0.85, 0.45, 0.1, 1.0)
+	},
+	"tin_bar": {
+		"display_name": "Tin Bar",
+		"value": 90,
+		"color": Color(0.75, 0.75, 0.7, 1.0)
+	},
+	"iron_bar": {
+		"display_name": "Iron Bar",
+		"value": 200,
+		"color": Color(0.55, 0.6, 0.65, 1.0)
+	},
+	"bronze_bar": {
+		"display_name": "Bronze Bar",
+		"value": 250,
+		"color": Color(0.8, 0.5, 0.2, 1.0)
+	},
+	"steel_bar": {
+		"display_name": "Steel Bar",
+		"value": 400,
+		"color": Color(0.5, 0.55, 0.6, 1.0)
+	},
+	"brass_bar": {
+		"display_name": "Brass Bar",
+		"value": 320,
+		"color": Color(0.85, 0.75, 0.3, 1.0)
+	},
+	"silver_ingot": {
+		"display_name": "Silver Ingot",
+		"value": 600,
+		"color": Color(0.9, 0.9, 1.0, 1.0)
+	},
+	"gold_ingot": {
+		"display_name": "Gold Ingot",
+		"value": 1200,
+		"color": Color(1.0, 0.85, 0.2, 1.0)
+	},
+	"titanium_ingot": {
+		"display_name": "Titanium Ingot",
+		"value": 2500,
+		"color": Color(0.5, 0.65, 0.8, 1.0)
+	},
+	"tungsten_ingot": {
+		"display_name": "Tungsten Ingot",
+		"value": 4000,
+		"color": Color(0.35, 0.4, 0.45, 1.0)
+	},
+	"gunpowder": {
+		"display_name": "Gunpowder",
+		"value": 80,
+		"color": Color(0.25, 0.25, 0.2, 1.0)
+	},
+	"uranium_rod": {
+		"display_name": "Uranium Rod",
+		"value": 8000,
+		"color": Color(0.2, 0.85, 0.2, 1.0)
+	},
+	"mythril_bar": {
+		"display_name": "Mythril Bar",
+		"value": 12000,
+		"color": Color(0.6, 0.85, 1.0, 1.0)
+	},
+	"adamantine_plate": {
+		"display_name": "Adamantine Plate",
+		"value": 20000,
+		"color": Color(0.35, 0.45, 0.55, 1.0)
+	},
 }
 
-# Helper: list materials in display order (categories grouped, valuable last)
 const DISPLAY_ORDER = [
+	# Raw materials
 	"basic_ore", "copper", "tin", "coal", "sulfur",
 	"iron", "silver", "aluminum", "lead", "zinc",
 	"gold", "platinum", "titanium", "tungsten",
 	"crystal", "ruby", "sapphire", "emerald", "diamond",
 	"obsidian", "uranium", "mythril", "adamantium",
+	# Refined outputs
+	"copper_bar", "tin_bar", "iron_bar", "bronze_bar", "steel_bar", "brass_bar",
+	"silver_ingot", "gold_ingot", "titanium_ingot", "tungsten_ingot",
+	"gunpowder", "uranium_rod", "mythril_bar", "adamantine_plate",
 ]

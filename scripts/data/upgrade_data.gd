@@ -136,6 +136,42 @@ const UPGRADES := {
 			{ "money": 25000, "resources": { "mythril": 5, "adamantium": 3 } },
 		]
 	},
+	"hull_armor": {
+		"name": "Hull Armor",
+		"category": CATEGORY_EQUIPMENT,
+		"description": "Reduces all contact damage from hazards.",
+		"player_var": "hull_tier",
+		"tiers": [
+			{ "money": 800,   "resources": { "iron": 20, "lead": 15 } },
+			{ "money": 2500,  "resources": { "lead": 30, "zinc": 20 } },
+			{ "money": 6000,  "resources": { "tungsten": 10, "titanium": 15 } },
+			{ "money": 15000, "resources": { "adamantium": 8, "mythril": 5 } },
+		]
+	},
+
+	"heat_shield": {
+		"name": "Heat Shield",
+		"category": CATEGORY_EQUIPMENT,
+		"description": "Reduces damage from lava and hot tiles near it.",
+		"player_var": "heat_shield_tier",
+		"tiers": [
+			{ "money": 1200,  "resources": { "aluminum": 20, "sulfur": 10 } },
+			{ "money": 4000,  "resources": { "obsidian": 10, "tungsten": 5 } },
+			{ "money": 12000, "resources": { "obsidian": 20, "adamantium": 3 } },
+		]
+	},
+
+	"cabin": {
+		"name": "Sealed Cabin",
+		"category": CATEGORY_EQUIPMENT,
+		"description": "Protects against gas and radiation. Window tints change with each upgrade.",
+		"player_var": "cabin_tier",
+		"tiers": [
+			{ "money": 800,   "resources": { "coal": 20, "copper": 10 } },
+			{ "money": 3000,  "resources": { "aluminum": 15, "silver": 8 } },
+			{ "money": 12000, "resources": { "platinum": 5, "mythril": 2 } },
+		]
+	},
 }
 
 
@@ -151,6 +187,9 @@ const STARTING_VALUES := {
 	"has_left_drill": false,
 	"has_right_drill": false,
 	"max_storage": 100,
+	"hull_tier": 0,
+	"heat_shield_tier": 0,
+	"cabin_tier": 0,
 }
 
 
@@ -167,4 +206,7 @@ const TIER_INCREMENTS := {
 	"has_left_drill": true,
 	"has_right_drill": true,
 	"max_storage": 100,    # +100 storage per tier
+	"hull_tier": 1,
+	"heat_shield_tier": 1,
+	"cabin_tier": 1,
 }

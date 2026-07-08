@@ -1,8 +1,8 @@
 [gd_scene format=3 uid="uid://ck4nxmqp7r2tw"]
 
 [ext_resource type="Script" path="res://scripts/tether.gd" id="1_teth"]
-[ext_resource type="Texture2D" uid="uid://trd0dj05tqsa" path="res://assets/Equipment/tether_frame1.png" id="2_teth"]
-[ext_resource type="Texture2D" uid="uid://gl0vsrxiymsq" path="res://assets/Equipment/tether_frame2.png" id="3_teth"]
+[ext_resource type="Texture2D" uid="uid://trd0dj05tqsa" path="res://assets/Art/Equipment/tether_frame1.png" id="2_teth"]
+[ext_resource type="Texture2D" uid="uid://gl0vsrxiymsq" path="res://assets/Art/Equipment/tether_frame2.png" id="3_teth"]
 
 [sub_resource type="SpriteFrames" id="SpriteFrames_teth"]
 animations = [{

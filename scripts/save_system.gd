@@ -1,7 +1,8 @@
 # save_system.gd
 extends Node
 
-const SAVE_PATH := "user://savegame.json"
+const SAVE_PATH       := "user://savegame.json"
+const SCREENSHOT_PATH := "user://save_screenshot.png"
 
 # in-memory copy of the latest save (or empty dict if no save)
 var data: Dictionary = {}
@@ -11,7 +12,15 @@ func has_save() -> bool:
 	return FileAccess.file_exists(SAVE_PATH)
 
 
+func save_screenshot(img: Image) -> void:
+	var resized := img.duplicate()
+	resized.resize(256, 144, Image.INTERPOLATE_BILINEAR)
+	resized.save_png(SCREENSHOT_PATH)
+
+
 func save_game(payload: Dictionary) -> bool:
+	payload["saved_at"]   = Time.get_datetime_string_from_system()
+	payload["save_name"]  = "Save 1"
 
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 

@@ -1,0 +1,117 @@
+[gd_scene format=3 uid="uid://cdevmenu001"]
+
+[ext_resource type="Script" uid="uid://3dvexo03hdqt" path="res://scripts/dev_menu.gd" id="1_devm"]
+
+[node name="DevMenu" type="CanvasLayer" unique_id=91000001]
+process_mode = 3
+layer = 200
+script = ExtResource("1_devm")
+
+[node name="Backdrop" type="ColorRect" parent="." unique_id=91000002]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0, 0, 0, 0.5)
+
+[node name="Panel" type="PanelContainer" parent="." unique_id=91000003]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -210.0
+offset_top = -260.0
+offset_right = 210.0
+offset_bottom = 260.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBox" type="VBoxContainer" parent="Panel" unique_id=91000004]
+layout_mode = 2
+
+[node name="TitleLabel" type="Label" parent="Panel/VBox" unique_id=91000005]
+layout_mode = 2
+text = "DEV MENU"
+horizontal_alignment = 1
+
+[node name="HBoxOne" type="HBoxContainer" parent="Panel/VBox" unique_id=91000006]
+layout_mode = 2
+
+[node name="GiveMoneyButton" type="Button" parent="Panel/VBox/HBoxOne" unique_id=91000007]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "+$1000"
+
+[node name="GiveLotsMoneyButton" type="Button" parent="Panel/VBox/HBoxOne" unique_id=91000008]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "+$10000"
+
+[node name="HBoxTwo" type="HBoxContainer" parent="Panel/VBox" unique_id=91000009]
+layout_mode = 2
+
+[node name="RefuelButton" type="Button" parent="Panel/VBox/HBoxTwo" unique_id=91000010]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Refuel"
+
+[node name="RestoreHealthButton" type="Button" parent="Panel/VBox/HBoxTwo" unique_id=91000011]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Restore HP"
+
+[node name="HBoxThree" type="HBoxContainer" parent="Panel/VBox" unique_id=91000012]
+layout_mode = 2
+
+[node name="GiveAllOresButton" type="Button" parent="Panel/VBox/HBoxThree" unique_id=91000013]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Give 50 of each ore"
+
+[node name="GiveGemsButton" type="Button" parent="Panel/VBox/HBoxThree" unique_id=91000014]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Give 20 of each gem"
+
+[node name="HBoxFour" type="HBoxContainer" parent="Panel/VBox" unique_id=91000015]
+layout_mode = 2
+
+[node name="DrillTierUpButton" type="Button" parent="Panel/VBox/HBoxFour" unique_id=91000016]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Drill +1 Tier"
+
+[node name="MaxAllUpgradesButton" type="Button" parent="Panel/VBox/HBoxFour" unique_id=91000017]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Max All Upgrades"
+
+[node name="HBoxFive" type="HBoxContainer" parent="Panel/VBox" unique_id=91000018]
+layout_mode = 2
+
+[node name="ToggleGodModeButton" type="Button" parent="Panel/VBox/HBoxFive" unique_id=91000019]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Toggle Godmode"
+
+[node name="ToggleNoclipButton" type="Button" parent="Panel/VBox/HBoxFive" unique_id=91000020]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Toggle Noclip"
+
+[node name="HBoxSix" type="HBoxContainer" parent="Panel/VBox" unique_id=91000021]
+layout_mode = 2
+
+[node name="TeleportToCoreButton" type="Button" parent="Panel/VBox/HBoxSix" unique_id=91000022]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Teleport to y=180"
+
+[node name="ResetPositionButton" type="Button" parent="Panel/VBox/HBoxSix" unique_id=91000023]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Reset to Spawn"
+
+[node name="CloseButton" type="Button" parent="Panel/VBox" unique_id=91000024]
+layout_mode = 2
+text = "Close"

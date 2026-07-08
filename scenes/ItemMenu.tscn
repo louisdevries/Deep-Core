@@ -42,6 +42,30 @@ size_flags_vertical = 3
 layout_mode = 2
 size_flags_horizontal = 3
 
+[node name="SlotZoneRow" type="HBoxContainer" parent="Panel/VBox" unique_id=89000009]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Slot1Zone" type="PanelContainer" parent="Panel/VBox/SlotZoneRow" unique_id=89000010]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Slot1Label" type="Label" parent="Panel/VBox/SlotZoneRow/Slot1Zone" unique_id=89000011]
+layout_mode = 2
+text = "Quick 1: —"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 11
+
+[node name="Slot2Zone" type="PanelContainer" parent="Panel/VBox/SlotZoneRow" unique_id=89000012]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Slot2Label" type="Label" parent="Panel/VBox/SlotZoneRow/Slot2Zone" unique_id=89000013]
+layout_mode = 2
+text = "Quick 2: —"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 11
+
 [node name="CloseButton" type="Button" parent="Panel/VBox" unique_id=89000008]
 layout_mode = 2
 text = "Close"

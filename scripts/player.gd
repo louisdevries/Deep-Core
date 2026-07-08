@@ -6,12 +6,18 @@ const UpgradeData = preload("res://scripts/data/upgrade_data.gd")
 const ResourceData = preload("res://scripts/data/resource_data.gd")
 const ItemData    = preload("res://scripts/data/item_data.gd")
 
+const CRACK_TEXTURES: Array = [
+	preload("res://assets/Art/Environment/crack_light.png"),
+	preload("res://assets/Art/Environment/crack_medium.png"),
+	preload("res://assets/Art/Environment/crack_heavy.png"),
+]
+const CRACK_THRESHOLDS: Array[float] = [0.15, 0.45, 0.75]
+
 @export var move_speed = 200.0
-@export var drill_interval = 0.15
 
 @export var max_fuel = 100.0
-@export var fuel_drain_move = 2.0
-@export var fuel_drain_drill = 6.0
+@export var fuel_drain_move = 0.0
+@export var fuel_drain_drill = 4.0
 
 @export var ore_sell_value = 10
 
@@ -32,11 +38,25 @@ var hazard_layer: TileMapLayer
 
 const TILE_SOURCE_ID = 1
 
+# Break time by material_tier (index 0 unused; tier 1-6)
+const MATERIAL_BREAK_TIMES: Array[float] = [0.0, 1.0, 2.0, 3.5, 5.0, 7.5, 10.0]
+
+# Time multiplier by drill_tier (0=Bronze … 5=Plasma). Lower = faster.
+const DRILL_TIME_MULT: Array[float] = [1.0, 0.85, 0.7, 0.55, 0.4, 0.25]
+
+# Break-time factor by gear (index 0 unused; gear 1-3).
+# Gear 2/3 burn more fuel but also drill more slowly (factor > 1).
+const GEAR_TIME_FACTOR: Array[float] = [0.0, 1.0, 1.515, 1.205]
+
 var fuel = 100.0
 
 var terrain
 var is_drilling = false
-var drill_timer = 0.0
+
+# Per-tile break-time progress (tile_pos → accumulated seconds)
+var _tile_progress: Dictionary = {}
+# Crack overlay sprites (tile_pos → Sprite2D)
+var _tile_crack_sprites: Dictionary = {}
 
 var last_direction = Vector2.DOWN
 
@@ -70,11 +90,16 @@ var _fall_damage_multiplier: float = 0.25
 var drill_count: int = 1
 var permanent_drills: Array[Vector2i] = []   # which sides are permanently mounted
 
+var hull_tier: int = 0
+var heat_shield_tier: int = 0
+var cabin_tier: int = 0
+
 # RESPAWN
 var spawn_position: Vector2
 
 # ITEM INVENTORY — one-time use tools
 var item_inventory: Dictionary = {}
+var quick_slots: Array = ["", ""]
 
 # PHASE BEACON
 var has_active_beacon: bool = false
@@ -250,11 +275,34 @@ var drill_idle_sound
 var drill_loop_sound
 var drill_impact_sound
 
+# HAZARD AMBIENT SFX (looping, volume-faded)
+var _hazard_sound_lava: AudioStreamPlayer = null
+var _hazard_sound_gas: AudioStreamPlayer = null
+var _hazard_sound_acid: AudioStreamPlayer = null
+var _hazard_sound_freezing: AudioStreamPlayer = null
+var _is_in_lava: bool = false
+
+# DAMAGE SFX
+var _damage_sfx: AudioStreamPlayer = null
+var _lava_damage_sfx: AudioStreamPlayer = null
+
+# AMBIENCE LAYERS (depth-based crossfade)
+var _ambience_layers: Array = []
+
+# SONAR SFX
+var _sonar_sfx: AudioStreamPlayer = null
+
 # DRILL SWIVEL
 var drill_swivel_tier: int = 1
 var drill_direction: Vector2i = Vector2i.DOWN
 var has_left_drill: bool = false
 var has_right_drill: bool = false
+
+const DRILL_SWITCH_DELAY: float = 3.0
+var _pending_drill_dir: Vector2i = Vector2i.DOWN
+var _switching_drill: bool = false
+var _drill_switch_progress: float = 0.0
+var _switch_bar: Node2D = null
 
 var cargo = 0
 var max_cargo = 20
@@ -275,6 +323,9 @@ var sonar_sweep_time: float = 0.0
 var sonar_sweep_duration: float = 0.8
 var sonar_last_radius: float = 0.0
 var sonar_center_tile: Vector2i
+
+var godmode: bool = false
+var noclip: bool = false
 
 @onready var player_light = $PointLight2D
 
@@ -318,12 +369,60 @@ func _ready():
 	if not save.is_empty():
 		apply_player_save(save)
 
+	drill_idle_sound.bus = "SFX"
+	drill_idle_sound.finished.connect(_on_drill_idle_finished)
+	drill_idle_sound.volume_db = -20.0
+	drill_idle_sound.pitch_scale = 0.85
 	drill_idle_sound.play()
+
+	drill_impact_sound.bus = "SFX"
+
+	# Hazard ambient SFX
+	_hazard_sound_lava     = _make_sfx_loop("res://assets/Audio/SFX/lava.wav")
+	_hazard_sound_gas      = _make_sfx_loop("res://assets/Audio/SFX/Gas.wav")
+	_hazard_sound_acid     = _make_sfx_loop("res://assets/Audio/SFX/Acid.wav")
+	_hazard_sound_freezing = _make_sfx_loop("res://assets/Audio/SFX/Freezing.wav")
+
+	# Damage SFX
+	_damage_sfx = AudioStreamPlayer.new()
+	_damage_sfx.stream = load("res://assets/Audio/SFX/Damage.wav")
+	_damage_sfx.bus = "SFX"
+	add_child(_damage_sfx)
+
+	_lava_damage_sfx = AudioStreamPlayer.new()
+	_lava_damage_sfx.stream = load("res://assets/Audio/SFX/lava_damage.wav")
+	_lava_damage_sfx.bus = "SFX"
+	add_child(_lava_damage_sfx)
+
+	# Sonar SFX
+	_sonar_sfx = AudioStreamPlayer.new()
+	_sonar_sfx.stream = load("res://assets/Audio/SFX/echo.wav")
+	_sonar_sfx.bus = "SFX"
+	add_child(_sonar_sfx)
+
+	# Ambience layers (depth-based crossfade)
+	for i in range(1, 4):
+		var ap := AudioStreamPlayer.new()
+		ap.stream = load("res://assets/Audio/Ambience/Layer_%d.mp3" % i)
+		ap.bus = "Music"
+		ap.volume_db = -80.0
+		ap.finished.connect(ap.play)
+		add_child(ap)
+		ap.play()
+		_ambience_layers.append(ap)
+
+	_switch_bar = Node2D.new()
+	_switch_bar.set_script(load("res://scripts/drill_switch_bar.gd"))
+	_switch_bar.z_index = 8
+	add_child(_switch_bar)
+
+	_setup_player_sprites()
 
 
 func _physics_process(delta):
 
 	handle_input()
+	_update_drill_switch(delta)
 
 	update_sonar_sweep(delta)
 	if sonar_cooldown_timer > 0.0:
@@ -339,9 +438,20 @@ func _physics_process(delta):
 		return
 
 	handle_movement(delta)
+	if noclip:
+	# bypass physics, just move freely
+		var direction: Vector2 = Vector2.ZERO
+		direction.x = Input.get_axis("ui_left", "ui_right")
+		direction.y = Input.get_axis("ui_up", "ui_down")
+		global_position += direction * 400.0 * delta
+		return
+
+# ... normal movement
+
+	_update_drill_audio()
+	_update_ambience_audio(delta)
 
 	if is_drilling and fuel > 0:
-		drill_idle_sound.pitch_scale = 1.0 + (drill_gear * 0.03)
 		drill(delta)
 
 	fuel = clamp(fuel, 0.0, max_fuel)
@@ -371,7 +481,7 @@ func _physics_process(delta):
 			Vector2i.DOWN:  ui_drill_dir_label.text = "Drill: ↓"
 			Vector2i.RIGHT: ui_drill_dir_label.text = "Drill: →"
 			
-	_update_machine_sprite()
+	_update_all_sprites()
 	current_depth = int(global_position.y / 16)
 	update_player_light()
 	update_darkness()
@@ -400,13 +510,8 @@ func handle_input():
 	if Input.is_action_just_pressed("sonar"):
 		use_sonar()
 
-	# Audio transitions
-	if is_drilling and not was_drilling:
-		drill_idle_sound.volume_db = -6
-		drill_idle_sound.pitch_scale = 1.08
-	elif not is_drilling and was_drilling:
-		drill_idle_sound.volume_db = -12
-		drill_idle_sound.pitch_scale = 1.0
+	if not is_drilling and was_drilling:
+		_clear_all_cracks()
 
 	# DRILL DIRECTION (swivel system)
 	if drill_swivel_tier >= 2:
@@ -453,110 +558,175 @@ func world_to_tile(pos: Vector2) -> Vector2i:
 
 func drill(delta: float) -> void:
 
-	drill_timer += delta
-
-	var effective_interval: float = drill_interval
+	# Fuel drains continuously while drilling
+	var fuel_mult: float = 1.0
 	match drill_gear:
-		2: effective_interval = drill_interval * 1.5
-		3: effective_interval = drill_interval * 1.25
+		2: fuel_mult = 3.0
+		3: fuel_mult = 5.0
+	fuel -= fuel_drain_drill * fuel_mult * delta
 
-	if drill_timer < effective_interval:
-		return
+	# Accumulate progress on every targeted tile this frame
+	var active_targets: Array = _compute_drill_targets()  # Array of {pos, flip_h, rot}
+	var active_positions: Array[Vector2i] = []
+	for t in active_targets:
+		active_positions.append(t["pos"])
+		_advance_drill_tile(t["pos"], t["flip_h"], t["rot"], delta)
 
-	drill_timer = 0.0
+	# Drop stale tiles (no longer being targeted)
+	var stale: Array = []
+	for tile_pos in _tile_progress.keys():
+		if not (tile_pos in active_positions):
+			stale.append(tile_pos)
+	for tile_pos in stale:
+		_tile_progress.erase(tile_pos)
+		_free_crack_sprite(tile_pos)
 
-	var fuel_multiplier: float = 1.0
-	match drill_gear:
-		2: fuel_multiplier = 3.0
-		3: fuel_multiplier = 5.0
-	fuel -= fuel_drain_drill * fuel_multiplier * delta
 
-	var perpendicular_offset: int = 8
-	var depth_offset: int = 20
-
-	# Build list of drill directions based on multi-drill upgrade and current swivel
-	var drill_dirs: Array = _get_active_drill_directions()
-
-	# For each active direction, drill 2 perpendicular tiles
-	for dir: Vector2i in drill_dirs:
-
-		var target_a: Vector2
-		var target_b: Vector2
-
+func _compute_drill_targets() -> Array:
+	var targets: Array = []
+	const P_OFF: int = 8
+	const D_OFF: int = 20
+	for dir: Vector2i in _get_active_drill_directions():
 		match dir:
-
 			Vector2i.DOWN:
-				target_a = global_position + Vector2(-perpendicular_offset, depth_offset)
-				target_b = global_position + Vector2(perpendicular_offset, depth_offset)
-
+				# Left tile: crack "/" as-is; Right tile: flip_h → "\"
+				targets.append({"pos": world_to_tile(global_position + Vector2(-P_OFF,  D_OFF)), "flip_h": false, "rot": 0.0})
+				targets.append({"pos": world_to_tile(global_position + Vector2( P_OFF,  D_OFF)), "flip_h": true,  "rot": 0.0})
 			Vector2i.LEFT:
-				target_a = global_position + Vector2(-depth_offset, -perpendicular_offset)
-				target_b = global_position + Vector2(-depth_offset, perpendicular_offset)
-
+				# Top tile: rotate 90°; Bottom tile: rotate -90°
+				targets.append({"pos": world_to_tile(global_position + Vector2(-D_OFF, -P_OFF)), "flip_h": false, "rot":  90.0})
+				targets.append({"pos": world_to_tile(global_position + Vector2(-D_OFF,  P_OFF)), "flip_h": false, "rot": -90.0})
 			Vector2i.RIGHT:
-				target_a = global_position + Vector2(depth_offset, -perpendicular_offset)
-				target_b = global_position + Vector2(depth_offset, perpendicular_offset)
+				targets.append({"pos": world_to_tile(global_position + Vector2( D_OFF, -P_OFF)), "flip_h": false, "rot": -90.0})
+				targets.append({"pos": world_to_tile(global_position + Vector2( D_OFF,  P_OFF)), "flip_h": false, "rot":  90.0})
+	return targets
 
-		try_break_tile(world_to_tile(target_a))
-		try_break_tile(world_to_tile(target_b))
 
-func try_break_tile(tile_pos: Vector2i):
+func _advance_drill_tile(tile_pos: Vector2i, flip_h: bool, rot: float, delta: float) -> void:
 
 	var tile_data: Vector2i = terrain.get_cell_atlas_coords(tile_pos)
 	var source_layer: TileMapLayer = terrain
 
 	if tile_data == Vector2i(-1, -1) and hazard_layer:
-		tile_data = hazard_layer.get_cell_atlas_coords(tile_pos)
+		tile_data    = hazard_layer.get_cell_atlas_coords(tile_pos)
 		source_layer = hazard_layer
 
 	if tile_data == Vector2i(-1, -1):
 		return
-
 	if not TerrainData.TERRAIN_TYPES.has(tile_data):
 		return
 
-	var terrain_info = TerrainData.TERRAIN_TYPES[tile_data]
-
+	var terrain_info: Dictionary = TerrainData.TERRAIN_TYPES[tile_data]
 	var material_tier: int = terrain_info.get("material_tier", 1)
+
 	var max_breakable_tier: int = drill_tier + 1
 	if drill_gear >= 2:
 		max_breakable_tier += 1
 	if max_breakable_tier < material_tier:
 		return
 
-	var cargo_value = terrain_info["cargo"]
+	var base_time: float   = MATERIAL_BREAK_TIMES[clampi(material_tier, 0, MATERIAL_BREAK_TIMES.size() - 1)]
+	var drill_mult: float  = DRILL_TIME_MULT[clampi(drill_tier, 0, DRILL_TIME_MULT.size() - 1)]
+	var gear_factor: float = GEAR_TIME_FACTOR[clampi(drill_gear, 1, GEAR_TIME_FACTOR.size() - 1)]
+	var break_time: float  = base_time * drill_mult * gear_factor
 
-	if cargo_value > 0 and cargo + cargo_value > max_cargo:
+	var is_new: bool = not _tile_progress.has(tile_pos)
+	if is_new:
+		_tile_progress[tile_pos] = 0.0
+		spawn_drill_particles(tile_pos, tile_data)
+		# per-tile drill sound removed — continuous ambient loop handles this
+		_create_crack_sprite(tile_pos, flip_h, rot)
+	else:
+		if drill_particles:
+			drill_particles.global_position = terrain.to_global(terrain.map_to_local(tile_pos))
+
+	shake_strength = max(shake_strength, material_tier * 0.5)
+	_tile_progress[tile_pos] += delta
+
+	# Update crack overlay texture based on progress ratio
+	var ratio: float = _tile_progress[tile_pos] / break_time
+	_update_crack_sprite(tile_pos, ratio)
+
+	if _tile_progress[tile_pos] >= break_time:
+		_free_crack_sprite(tile_pos)
+		_tile_progress.erase(tile_pos)
+		_execute_break(tile_pos, tile_data, source_layer, terrain_info)
+
+
+func _create_crack_sprite(tile_pos: Vector2i, flip_h: bool, rot: float) -> void:
+	var sprite := Sprite2D.new()
+	sprite.flip_h            = flip_h
+	sprite.rotation_degrees  = rot
+	sprite.z_index           = 5
+	sprite.centered          = true
+	# Auto-scale to fit a 16×16 tile using the light texture as reference
+	var ref_tex: Texture2D = CRACK_TEXTURES[0]
+	if ref_tex and ref_tex.get_width() > 0:
+		sprite.scale = Vector2(16.0 / ref_tex.get_width(), 16.0 / ref_tex.get_height())
+	sprite.global_position   = terrain.to_global(terrain.map_to_local(tile_pos))
+	get_tree().current_scene.add_child(sprite)
+	_tile_crack_sprites[tile_pos] = sprite
+
+
+func _update_crack_sprite(tile_pos: Vector2i, ratio: float) -> void:
+	if not _tile_crack_sprites.has(tile_pos):
 		return
+	var sprite: Sprite2D = _tile_crack_sprites[tile_pos]
+	sprite.global_position = terrain.to_global(terrain.map_to_local(tile_pos))
+	if ratio >= CRACK_THRESHOLDS[2]:
+		sprite.texture = CRACK_TEXTURES[2]
+	elif ratio >= CRACK_THRESHOLDS[1]:
+		sprite.texture = CRACK_TEXTURES[1]
+	elif ratio >= CRACK_THRESHOLDS[0]:
+		sprite.texture = CRACK_TEXTURES[0]
+	else:
+		sprite.texture = null
 
-	spawn_drill_particles(tile_pos, tile_data)
-	shake_strength = material_tier * 0.6
-	play_drill_sound(tile_data)
+
+func _free_crack_sprite(tile_pos: Vector2i) -> void:
+	if _tile_crack_sprites.has(tile_pos):
+		if is_instance_valid(_tile_crack_sprites[tile_pos]):
+			_tile_crack_sprites[tile_pos].queue_free()
+		_tile_crack_sprites.erase(tile_pos)
+
+
+func _clear_all_cracks() -> void:
+	for tile_pos in _tile_crack_sprites.keys():
+		if is_instance_valid(_tile_crack_sprites[tile_pos]):
+			_tile_crack_sprites[tile_pos].queue_free()
+	_tile_crack_sprites.clear()
+	_tile_progress.clear()
+
+
+func _execute_break(tile_pos: Vector2i, tile_data: Vector2i, source_layer: TileMapLayer, terrain_info: Dictionary) -> void:
+
 	play_impact_sound(tile_data)
 
 	var resource_type = terrain_info["resource"]
+	var cargo_value: int = terrain_info.get("cargo", 0)
+	var cargo_full: bool = cargo_value > 0 and cargo + cargo_value > max_cargo
 
-	if resource_type != null:
-		if not resources.has(resource_type):
-			resources[resource_type] = 0
-		resources[resource_type] += 1
+	if cargo_full:
 		var world_pos: Vector2 = terrain.to_global(terrain.map_to_local(tile_pos))
-		var display: String = ResourceData.RESOURCES.get(resource_type, {}).get("display_name", resource_type)
-		_spawn_floating_text("+1 " + display, world_pos)
-	elif terrain_info.get("is_ore", false):
-		ore += 1
-		var world_pos: Vector2 = terrain.to_global(terrain.map_to_local(tile_pos))
-		_spawn_floating_text("+1 Basic Ore", world_pos)
+		_spawn_floating_text("CARGO FULL", world_pos)
+	else:
+		if resource_type != null:
+			if not resources.has(resource_type):
+				resources[resource_type] = 0
+			resources[resource_type] += 1
+			var world_pos: Vector2 = terrain.to_global(terrain.map_to_local(tile_pos))
+			var display: String = ResourceData.RESOURCES.get(resource_type, {}).get("display_name", resource_type)
+			_spawn_floating_text("+1 " + display, world_pos)
+		elif terrain_info.get("is_ore", false):
+			ore += 1
+			var world_pos: Vector2 = terrain.to_global(terrain.map_to_local(tile_pos))
+			_spawn_floating_text("+1 Basic Ore", world_pos)
 
-	cargo += cargo_value
-
+		cargo += cargo_value
 	source_layer.set_cell(tile_pos, -1)
 
-	# track for save system (only terrain-layer breaks, not hazards)
 	if source_layer == terrain and terrain.has_method("mark_cleared"):
 		terrain.mark_cleared(tile_pos)
-
-	# wake hazards that might want to flow into the new empty cell
 	if terrain.has_method("_wake_neighbors"):
 		terrain._wake_neighbors(tile_pos)
 
@@ -599,11 +769,75 @@ func play_drill_sound(tile_data):
 
 	if not drill_sound:
 		return
-
 	var category: String = _get_category(tile_data)
 	drill_sound.pitch_scale = CATEGORY_DRILL_PITCH.get(category, 1.0)
-
 	drill_sound.play()
+
+
+func _on_drill_idle_finished() -> void:
+	if drill_idle_sound:
+		drill_idle_sound.play()
+
+
+func _update_drill_audio() -> void:
+	if not drill_idle_sound:
+		return
+	# Keep the stream alive — it should always be playing
+	if not drill_idle_sound.is_playing():
+		drill_idle_sound.play()
+	if is_drilling:
+		match drill_gear:
+			1:
+				drill_idle_sound.volume_db  = -8.0
+				drill_idle_sound.pitch_scale = 1.0
+			2:
+				drill_idle_sound.volume_db  = -4.0
+				drill_idle_sound.pitch_scale = 1.3
+			3:
+				drill_idle_sound.volume_db  = 0.0
+				drill_idle_sound.pitch_scale = 1.7
+	else:
+		drill_idle_sound.volume_db  = -20.0
+		drill_idle_sound.pitch_scale = 0.85
+
+
+func _make_sfx_loop(path: String) -> AudioStreamPlayer:
+	var ap := AudioStreamPlayer.new()
+	ap.stream = load(path)
+	ap.bus = "SFX"
+	ap.volume_db = -80.0
+	ap.finished.connect(ap.play)
+	add_child(ap)
+	ap.play()
+	return ap
+
+
+func _update_hazard_audio(in_lava: bool, in_gas: bool, in_acid: bool, in_ice: bool, delta: float) -> void:
+	var speed := 20.0 * delta
+	if _hazard_sound_lava:
+		_hazard_sound_lava.volume_db = move_toward(_hazard_sound_lava.volume_db, -8.0 if in_lava else -80.0, speed)
+	if _hazard_sound_gas:
+		_hazard_sound_gas.volume_db = move_toward(_hazard_sound_gas.volume_db, -8.0 if in_gas else -80.0, speed)
+	if _hazard_sound_acid:
+		_hazard_sound_acid.volume_db = move_toward(_hazard_sound_acid.volume_db, -8.0 if in_acid else -80.0, speed)
+	if _hazard_sound_freezing:
+		_hazard_sound_freezing.volume_db = move_toward(_hazard_sound_freezing.volume_db, -8.0 if in_ice else -80.0, speed)
+
+
+func _update_ambience_audio(delta: float) -> void:
+	if _ambience_layers.size() < 3:
+		return
+	var depth := float(current_depth)
+	# Layer 1: surface (full at 0-5, silent at depth 55+)
+	var t1 := 1.0 - clampf((depth - 5.0) / 50.0, 0.0, 1.0)
+	# Layer 2: mid-depth (peaks around depth 50, fades out by 120)
+	var t2 := clampf(depth / 40.0, 0.0, 1.0) * (1.0 - clampf((depth - 80.0) / 40.0, 0.0, 1.0))
+	# Layer 3: deep (fades in from depth 70-120)
+	var t3 := clampf((depth - 70.0) / 50.0, 0.0, 1.0)
+	var fade := 5.0 * delta
+	_ambience_layers[0].volume_db = move_toward(_ambience_layers[0].volume_db, lerp(-40.0, -10.0, t1), fade)
+	_ambience_layers[1].volume_db = move_toward(_ambience_layers[1].volume_db, lerp(-40.0, -10.0, t2), fade)
+	_ambience_layers[2].volume_db = move_toward(_ambience_layers[2].volume_db, lerp(-40.0, -10.0, t3), fade)
 
 
 func play_impact_sound(tile_data):
@@ -667,6 +901,9 @@ func use_sonar() -> void:
 	sonar_sweep_time = 0.0
 	sonar_last_radius = 0.0
 	sonar_center_tile = world_to_tile(global_position)
+
+	if _sonar_sfx:
+		_sonar_sfx.play()
 
 	print("Sonar sweep started")
 
@@ -751,9 +988,18 @@ func spawn_markers_in_ring(inner: float, outer: float) -> void:
 
 
 func take_damage(amount: float, source: String = "") -> void:
-
-	if is_dead:
+	if is_dead or godmode:
 		return
+
+	if source == "fall" and _damage_sfx and not _damage_sfx.is_playing():
+		_damage_sfx.play()
+	elif source == "hazard" and _is_in_lava and _lava_damage_sfx and not _lava_damage_sfx.is_playing():
+		_lava_damage_sfx.play()
+
+	# apply hull armor reduction to physical damage
+	if source != "radiation" and source != "heat":
+		var hull_reduction: float = _get_hull_reduction()
+		amount *= (1.0 - hull_reduction)
 
 	health -= amount
 	time_since_damage = 0.0
@@ -761,10 +1007,17 @@ func take_damage(amount: float, source: String = "") -> void:
 
 	shake_strength = max(shake_strength, amount * 0.15)
 
-	print("Took ", amount, " damage from ", source, " | HP: ", health)
-
 	if health <= 0.0:
 		die()
+
+
+func _get_hull_reduction() -> float:
+	match hull_tier:
+		0: return 0.0
+		1: return 0.1     # 10% reduction
+		2: return 0.25    # 25%
+		3: return 0.4     # 40%
+		_: return 0.6     # 60% (max tier)
 
 
 func die() -> void:
@@ -787,6 +1040,7 @@ func die() -> void:
 		_beacon_node.queue_free()
 	_beacon_node      = null
 	has_active_beacon = false
+	_clear_all_cracks()
 
 	get_tree().create_timer(1.5).timeout.connect(respawn)
 
@@ -803,7 +1057,9 @@ func respawn() -> void:
 
 func check_hazard_contact(delta: float) -> void:
 
-	if is_dead:
+	if is_dead or godmode:
+		_is_in_lava = false
+		_update_hazard_audio(false, false, false, false, delta)
 		return
 
 	if not hazard_layer:
@@ -819,6 +1075,10 @@ func check_hazard_contact(delta: float) -> void:
 
 	var health_dmg: float = 0.0
 	var fuel_dmg: float = 0.0
+	var in_lava := false
+	var in_gas := false
+	var in_acid := false
+	var in_ice := false
 
 	for offset in check_offsets:
 
@@ -845,6 +1105,15 @@ func check_hazard_contact(delta: float) -> void:
 		if fh > fuel_dmg:
 			fuel_dmg = fh
 
+		match info["hazard"]:
+			"lava":  in_lava = true
+			"gas":   in_gas  = true
+			"acid":  in_acid = true
+			"ice":   in_ice  = true
+
+	_is_in_lava = in_lava
+	_update_hazard_audio(in_lava, in_gas, in_acid, in_ice, delta)
+
 	if health_dmg > 0.0:
 		take_damage(health_dmg * delta, "hazard")
 
@@ -864,9 +1133,9 @@ func update_health(delta: float) -> void:
 
 	if damage_flash_timer > 0.0:
 		damage_flash_timer -= delta
-		$MachineSprite.modulate = Color(1.5, 0.4, 0.4, 1.0)
+		_set_sprite_modulate(Color(1.5, 0.4, 0.4, 1.0))
 	else:
-		$MachineSprite.modulate = Color.WHITE
+		_set_sprite_modulate(Color.WHITE)
 
 
 func build_player_save() -> Dictionary:
@@ -896,6 +1165,9 @@ func build_player_save() -> Dictionary:
 		"storage": storage,
 		"max_storage": max_storage,
 		"item_inventory": item_inventory,
+		"quick_slots": quick_slots,
+		"drill_gear": drill_gear,
+		"furnace": FurnaceSystem.save_data(),
 	}
 
 
@@ -928,6 +1200,7 @@ func apply_player_save(save: Dictionary) -> void:
 	furnace_slot_count = save.get("furnace_slot_count", 1)
 	furnace_level = save.get("furnace_level", 1)
 	drill_tier = save.get("drill_tier", 0)
+	drill_gear = save.get("drill_gear", 1)
 	FurnaceSystem.slot_count = furnace_slot_count
 	if save.has("drill_direction"):
 		var d: Array = save["drill_direction"]
@@ -944,6 +1217,17 @@ func apply_player_save(save: Dictionary) -> void:
 		for key in save["item_inventory"].keys():
 			item_inventory[key] = int(save["item_inventory"][key])
 
+	if save.has("quick_slots"):
+		quick_slots = Array(save["quick_slots"])
+		while quick_slots.size() < 2:
+			quick_slots.append("")
+
+	FurnaceSystem.load_from_save_data(save)
+
+	var mc := get_tree().get_root().find_child("MobileControls", true, false)
+	if mc and mc.has_method("_sync_gear_knob_to_player"):
+		mc._sync_gear_knob_to_player()
+
 
 func _handle_swivel_input() -> void:
 
@@ -956,17 +1240,48 @@ func _handle_swivel_input() -> void:
 
 	# tier 3: no restrictions
 
-	# Can't swivel toward a permanently-mounted drill (it's already there)
 	if Input.is_action_just_pressed("drill_left"):
 		if not (Vector2i.LEFT in permanent_drills):
-			drill_direction = Vector2i.LEFT
+			request_drill_direction(Vector2i.LEFT)
 
 	elif Input.is_action_just_pressed("drill_down"):
-		drill_direction = Vector2i.DOWN
+		request_drill_direction(Vector2i.DOWN)
 
 	elif Input.is_action_just_pressed("drill_right"):
 		if not (Vector2i.RIGHT in permanent_drills):
-			drill_direction = Vector2i.RIGHT
+			request_drill_direction(Vector2i.RIGHT)
+
+
+func request_drill_direction(new_dir: Vector2i) -> void:
+	if new_dir == drill_direction and not _switching_drill:
+		return
+	if new_dir == drill_direction:
+		_switching_drill = false
+		_drill_switch_progress = 0.0
+		if _switch_bar:
+			_switch_bar.call("hide_bar")
+		return
+	if _switching_drill and new_dir == _pending_drill_dir:
+		return
+	_pending_drill_dir = new_dir
+	_drill_switch_progress = 0.0
+	_switching_drill = true
+	if _switch_bar:
+		_switch_bar.call("show_bar", 0.0)
+
+
+func _update_drill_switch(delta: float) -> void:
+	if not _switching_drill:
+		return
+	_drill_switch_progress = minf(_drill_switch_progress + delta / DRILL_SWITCH_DELAY, 1.0)
+	if _switch_bar:
+		_switch_bar.call("show_bar", _drill_switch_progress)
+	if _drill_switch_progress >= 1.0:
+		drill_direction = _pending_drill_dir
+		_switching_drill = false
+		_drill_switch_progress = 0.0
+		if _switch_bar:
+			_switch_bar.call("hide_bar")
 
 
 
@@ -974,31 +1289,6 @@ func _handle_swivel_input() -> void:
 func _clamp_to_camera_bounds() -> void:
 	const HALF_W: float = 12.0
 	global_position.x = clamp(global_position.x, camera.limit_left + HALF_W, camera.limit_right - HALF_W)
-
-
-func _get_drill_animation_name() -> String:
-
-	# Stage 4: both sides mounted
-	if has_left_drill and has_right_drill:
-		return "full"
-
-	# Stage 3a: left drill mounted
-	if has_left_drill:
-		match drill_direction:
-			Vector2i.RIGHT: return "left_right"
-			_:              return "bottom_left"
-
-	# Stage 3b: right drill mounted
-	if has_right_drill:
-		match drill_direction:
-			Vector2i.LEFT:  return "left_right"
-			_:              return "bottom_right"
-
-	# Stage 1 or 2: starter drill only
-	match drill_direction:
-		Vector2i.LEFT:  return "left"
-		Vector2i.RIGHT: return "right"
-		_:              return "down"
 
 
 func _get_active_drill_directions() -> Array:
@@ -1013,49 +1303,222 @@ func _get_active_drill_directions() -> Array:
 
 	return dirs
 	
-const DrillSpriteData = preload("res://scripts/data/drill_sprite_data.gd")
+# ============================
+# LAYERED SPRITE SYSTEM
+# All part sprites share the same 36×32 canvas origin — no positional offset needed.
+# ============================
 
 var _displayed_drill_tier: int = -1
+var _hull_sprite: Sprite2D = null
+var _heat_shield_sprite: Sprite2D = null
+var _cabin_sprite: Sprite2D = null
+var _thruster_sprite: Sprite2D = null
+var _drill_sprite: AnimatedSprite2D = null
+var _left_drill_sprite: AnimatedSprite2D = null
+var _right_drill_sprite: AnimatedSprite2D = null
+var _drill_in_startup: bool = false
+var _displayed_hull_tier: int = -1
+var _displayed_heat_shield_tier: int = -1
+var _displayed_cabin_tier: int = -1
+var _displayed_thruster_tier: int = -1
+var _displayed_thruster_on: bool = false
 
-func _apply_drill_tier_sprites(tier: int) -> void:
-	var machine_sprite: AnimatedSprite2D = $MachineSprite
-	if not machine_sprite:
-		return
-	var tier_data: Dictionary = DrillSpriteData.SPRITES[clampi(tier, 0, 5)]
+
+func _build_drill_frames(tier: int) -> SpriteFrames:
+	const TIER_FOLDER: Array[String] = ["Bronze", "Steel", "Steel", "Titanium", "Diamond", "Plasma"]
+	var folder: String = TIER_FOLDER[clampi(tier, 0, 5)]
 	var frames := SpriteFrames.new()
 	frames.remove_animation("default")
-	for anim_name in tier_data:
-		frames.add_animation(anim_name)
-		frames.set_animation_speed(anim_name, 10.0)
-		frames.set_animation_loop(anim_name, true)
-		for tex in tier_data[anim_name]:
-			frames.add_frame(anim_name, tex)
-	machine_sprite.sprite_frames = frames
-	_displayed_drill_tier = tier
+	if tier == 5:
+		frames.add_animation("startup")
+		frames.set_animation_speed("startup", 10.0)
+		frames.set_animation_loop("startup", false)
+		for i in range(1, 5):
+			frames.add_frame("startup", load("res://assets/Art/Player/Drill/Plasma/Plasma_Startup_%d.png" % i))
+	frames.add_animation("loop")
+	frames.set_animation_speed("loop", 10.0)
+	frames.set_animation_loop("loop", true)
+	for i in range(1, 4):
+		frames.add_frame("loop", load("res://assets/Art/Player/Drill/%s/%s_Frame %d.png" % [folder, folder, i]))
+	return frames
 
 
-func _update_machine_sprite() -> void:
+func _setup_player_sprites() -> void:
+	var old_machine := $MachineSprite as AnimatedSprite2D
+	if old_machine:
+		old_machine.visible = false
 
-	var machine_sprite: AnimatedSprite2D = $MachineSprite
-	if not machine_sprite:
+	_hull_sprite = Sprite2D.new()
+	_hull_sprite.z_index = 0
+	add_child(_hull_sprite)
+
+	_heat_shield_sprite = Sprite2D.new()
+	_heat_shield_sprite.z_index = 1
+	add_child(_heat_shield_sprite)
+
+	_thruster_sprite = Sprite2D.new()
+	_thruster_sprite.z_index = 2
+	add_child(_thruster_sprite)
+
+	_cabin_sprite = Sprite2D.new()
+	_cabin_sprite.z_index = 3
+	add_child(_cabin_sprite)
+
+	_left_drill_sprite = AnimatedSprite2D.new()
+	_left_drill_sprite.z_index = 4
+	_left_drill_sprite.visible = false
+	add_child(_left_drill_sprite)
+
+	_right_drill_sprite = AnimatedSprite2D.new()
+	_right_drill_sprite.z_index = 4
+	_right_drill_sprite.visible = false
+	add_child(_right_drill_sprite)
+
+	_drill_sprite = AnimatedSprite2D.new()
+	_drill_sprite.z_index = 4
+	add_child(_drill_sprite)
+	_drill_sprite.animation_finished.connect(_on_drill_animation_finished)
+
+	_update_all_sprites()
+
+
+func _on_drill_animation_finished() -> void:
+	if _drill_in_startup and is_drilling:
+		_drill_in_startup = false
+		_drill_sprite.play("loop")
+		if has_left_drill and _left_drill_sprite.visible:
+			_left_drill_sprite.play("loop")
+		if has_right_drill and _right_drill_sprite.visible:
+			_right_drill_sprite.play("loop")
+
+
+func _update_hull_sprite() -> void:
+	if not _hull_sprite:
+		return
+	var t: int = clampi(hull_tier, 0, 4)
+	if t == _displayed_hull_tier:
+		return
+	_hull_sprite.texture = load("res://assets/Art/Player/Hull/Hull_Tier_%d.png" % t)
+	_displayed_hull_tier = t
+
+
+func _update_heat_shield_sprite() -> void:
+	if not _heat_shield_sprite:
+		return
+	var t: int = clampi(heat_shield_tier, 0, 3)
+	if t == _displayed_heat_shield_tier:
+		return
+	_heat_shield_sprite.texture = load("res://assets/Art/Player/Heat Shield/Heat_Shield_Tier_%d.png" % t)
+	_displayed_heat_shield_tier = t
+
+
+func _update_cabin_sprite() -> void:
+	if not _cabin_sprite:
+		return
+	var t: int = clampi(cabin_tier, 0, 3)
+	if t == _displayed_cabin_tier:
+		return
+	_cabin_sprite.texture = load("res://assets/Art/Player/Cabin/Cabin_Tier %d.png" % t)
+	_displayed_cabin_tier = t
+
+
+func _update_thruster_sprite() -> void:
+	if not _thruster_sprite:
+		return
+	var t: int = clampi(int(round((thruster_force - 200.0) / 200.0)), 0, 4)
+	var on: bool = is_thrusting
+	if t == _displayed_thruster_tier and on == _displayed_thruster_on:
+		return
+	var tier_suffix: String = "_Tier_%d" % t if t > 0 else ""
+	var state: String = "On" if on else "Off"
+	_thruster_sprite.texture = load("res://assets/Art/Player/Thrusters/Thrusters_%s%s.png" % [state, tier_suffix])
+	_displayed_thruster_tier = t
+	_displayed_thruster_on = on
+
+
+func _apply_drill_transform(sprite: AnimatedSprite2D, dir: Vector2i) -> void:
+	sprite.position = Vector2.ZERO
+	match dir:
+		Vector2i.LEFT:  sprite.rotation_degrees = -90.0
+		Vector2i.RIGHT: sprite.rotation_degrees =  90.0
+		_:              sprite.rotation_degrees =   0.0
+
+
+func _set_drill_idle(sprite: AnimatedSprite2D, anim: String) -> void:
+	if sprite.animation != anim:
+		sprite.animation = anim
+	sprite.frame = 0
+
+
+func _update_drill_all() -> void:
+	if not _drill_sprite:
 		return
 
 	if drill_tier != _displayed_drill_tier:
-		_apply_drill_tier_sprites(drill_tier)
+		var frames := _build_drill_frames(drill_tier)
+		_drill_sprite.sprite_frames = frames
+		_left_drill_sprite.sprite_frames = frames
+		_right_drill_sprite.sprite_frames = frames
+		_displayed_drill_tier = drill_tier
+		_drill_in_startup = false
 
-	var target_anim: String = _get_drill_animation_name()
+	_apply_drill_transform(_drill_sprite, drill_direction)
+	if has_left_drill:
+		_apply_drill_transform(_left_drill_sprite, Vector2i.LEFT)
+	if has_right_drill:
+		_apply_drill_transform(_right_drill_sprite, Vector2i.RIGHT)
 
-	# only change animation if needed (avoid restarting every frame)
-	if machine_sprite.animation != target_anim:
-		machine_sprite.animation = target_anim
-		machine_sprite.frame = 0
+	_left_drill_sprite.visible = has_left_drill
+	_right_drill_sprite.visible = has_right_drill
 
-	# play animation while drilling, freeze on frame 0 when idle
-	if is_drilling and not machine_sprite.is_playing():
-		machine_sprite.play()
-	elif not is_drilling and machine_sprite.is_playing():
-		machine_sprite.stop()
-		machine_sprite.frame = 0
+	var speed: float = ([1.0, 1.6, 2.5] as Array)[clampi(drill_gear - 1, 0, 2)]
+	_drill_sprite.speed_scale = speed
+	_left_drill_sprite.speed_scale = speed
+	_right_drill_sprite.speed_scale = speed
+
+	var has_startup: bool = (drill_tier == 5
+		and _drill_sprite.sprite_frames != null
+		and _drill_sprite.sprite_frames.has_animation("startup"))
+
+	if is_drilling:
+		if not _drill_sprite.is_playing():
+			if has_startup and not _drill_in_startup:
+				_drill_in_startup = true
+				_drill_sprite.play("startup")
+				if has_left_drill:  _left_drill_sprite.play("startup")
+				if has_right_drill: _right_drill_sprite.play("startup")
+			elif not _drill_in_startup:
+				_drill_sprite.play("loop")
+				if has_left_drill:  _left_drill_sprite.play("loop")
+				if has_right_drill: _right_drill_sprite.play("loop")
+	else:
+		if _drill_sprite.is_playing():
+			_drill_sprite.stop()
+			_left_drill_sprite.stop()
+			_right_drill_sprite.stop()
+		_drill_in_startup = false
+		var idle_anim: String = "startup" if has_startup else "loop"
+		_set_drill_idle(_drill_sprite, idle_anim)
+		if has_left_drill:  _set_drill_idle(_left_drill_sprite, idle_anim)
+		if has_right_drill: _set_drill_idle(_right_drill_sprite, idle_anim)
+
+
+func _set_sprite_modulate(color: Color) -> void:
+	if _hull_sprite:          _hull_sprite.modulate = color
+	if _heat_shield_sprite:   _heat_shield_sprite.modulate = color
+	if _cabin_sprite:         _cabin_sprite.modulate = color
+	if _thruster_sprite:      _thruster_sprite.modulate = color
+	if _drill_sprite:         _drill_sprite.modulate = color
+	if _left_drill_sprite:    _left_drill_sprite.modulate = color
+	if _right_drill_sprite:   _right_drill_sprite.modulate = color
+
+
+func _update_all_sprites() -> void:
+	_update_hull_sprite()
+	_update_heat_shield_sprite()
+	_update_cabin_sprite()
+	_update_thruster_sprite()
+	_update_drill_all()
 
 
 func _on_inventory_button_pressed() -> void:

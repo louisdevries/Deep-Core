@@ -1,10 +1,10 @@
 [gd_scene format=3 uid="uid://dhhrc3fb2u6xc"]
 
-[ext_resource type="Texture2D" uid="uid://cunrlmjaygmsa" path="res://assets/sky.png" id="1_71j4m"]
-[ext_resource type="Texture2D" uid="uid://nlr8mi0jy4c3" path="res://assets/fog.png" id="1_qfnet"]
+[ext_resource type="Texture2D" uid="uid://cunrlmjaygmsa" path="res://assets/Art/Environment/sky.png" id="1_71j4m"]
+[ext_resource type="Texture2D" uid="uid://nlr8mi0jy4c3" path="res://assets/Art/Environment/fog.png" id="1_qfnet"]
 [ext_resource type="Script" uid="uid://b7ftlu2rhp6wr" path="res://scripts/sky_generator.gd" id="2_qfnet"]
 [ext_resource type="Script" uid="uid://cnhkmaf21wwbo" path="res://scripts/terrain_generator.gd" id="4_4mrxx"]
-[ext_resource type="Texture2D" uid="uid://p5irckkj5x6i" path="res://assets/terrain.png" id="5_4mrxx"]
+[ext_resource type="Texture2D" uid="uid://p5irckkj5x6i" path="res://assets/Art/Environment/terrain.png" id="5_4mrxx"]
 [ext_resource type="PackedScene" uid="uid://bgx6dsiwugpfm" path="res://scenes/player.tscn" id="5_7r4gi"]
 [ext_resource type="Script" uid="uid://bxv5nkdvqkh22" path="res://scripts/hazard_layer.gd" id="7_i7141"]
 
@@ -201,6 +201,7 @@ script = ExtResource("7_i7141")
 
 [node name="Player" parent="." unique_id=1572966348 groups=["player"] instance=ExtResource("5_7r4gi")]
 y_sort_enabled = true
+z_index = 2
 position = Vector2(145, -8)
 collision_layer = 3
 

@@ -1,18 +1,19 @@
 [gd_scene format=3 uid="uid://cdvr4h5qt8nfg"]
 
 [ext_resource type="Script" uid="uid://cfy5h5kyxxtr4" path="res://scripts/shop.gd" id="1_shop"]
-[ext_resource type="Texture2D" uid="uid://b3romuaakq4ds" path="res://assets/Equipment/Shop.png" id="2_shop"]
+[ext_resource type="Texture2D" uid="uid://b415b6bgghtp5" path="res://assets/Art/Buildings/Shop.png" id="2_vb8mm"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_shop"]
 size = Vector2(32, 32)
 
-[node name="Shop" type="Node2D"]
+[node name="Shop" type="Node2D" unique_id=929845548]
 script = ExtResource("1_shop")
 
-[node name="Sprite2D" type="Sprite2D" parent="."]
-texture = ExtResource("2_shop")
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=660876781]
+texture = ExtResource("2_vb8mm")
 
-[node name="Area2D" type="Area2D" parent="."]
+[node name="Area2D" type="Area2D" parent="." unique_id=13438012]
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=1177567296]
+scale = Vector2(2, 2)
 shape = SubResource("RectangleShape2D_shop")
